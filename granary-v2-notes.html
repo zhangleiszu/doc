@@ -1,0 +1,1357 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Granary-v2 学习笔记 — 聊天记录总结</title>
+<style> :root { --bg:#f8f9fa; --card:#fff; --border:#dee2e6; --text:#212529; --muted:#6c757d;
+  --primary:#76b900; --accent:#0d5c2e; --code-bg:#f1f3f5; --warn-bg:#fff3cd; --info-bg:#e7f5ff; }
+* { box-sizing:border-box; }
+body { font-family:-apple-system,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  background:var(--bg); color:var(--text); margin:0; line-height:1.7; }
+.container { max-width:1080px; margin:0 auto; padding:24px 20px 80px; }
+header { background:linear-gradient(135deg,#0d5c2e,#76b900); color:#fff; padding:40px 20px; text-align:center; }
+header h1 { margin:0 0 8px; font-size:28px; } header p { margin:0; opacity:.9; }
+nav { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:16px 20px; margin:20px 0; }
+nav ol { margin:8px 0; padding-left:22px; columns:2; column-gap:32px; }
+nav a { color:var(--accent); text-decoration:none; } nav a:hover { text-decoration:underline; }
+section { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:24px 28px; margin:22px 0; }
+h2 { color:var(--accent); border-bottom:3px solid var(--primary); padding-bottom:8px; margin-top:8px; font-size:22px; }
+h3 { color:#1b5e20; margin-top:28px; font-size:18px; border-left:4px solid var(--primary); padding-left:10px; }
+table { border-collapse:collapse; width:100%; margin:12px 0; font-size:13.5px; }
+th,td { border:1px solid var(--border); padding:7px 10px; text-align:left; vertical-align:top; }
+th { background:#eaf5e4; color:#1b5e20; } tr:nth-child(even) td { background:#fbfdf9; }
+table.keys th:first-child { width:96px; }
+pre { background:var(--code-bg); border:1px solid var(--border); border-radius:8px; padding:12px 14px;
+  overflow-x:auto; font-size:12.5px; line-height:1.55; margin:10px 0; }
+code { background:var(--code-bg); padding:1px 5px; border-radius:4px; font-size:13px;
+  font-family:"SF Mono",Menlo,Consolas,monospace; }
+pre code { background:none; padding:0; }
+.note { background:var(--info-bg); border-left:4px solid #1971c2; padding:10px 14px; border-radius:0 8px 8px 0; margin:14px 0; font-size:14px; }
+.warn { background:var(--warn-bg); border-left:4px solid #f08c00; padding:10px 14px; border-radius:0 8px 8px 0; margin:14px 0; font-size:14px; }
+.tag { display:inline-block; background:var(--primary); color:#fff; border-radius:12px; padding:1px 10px;
+  font-size:12px; margin-left:8px; vertical-align:middle; font-weight:normal; }
+.tag.gray { background:#868e96; } .tag.blue { background:#1971c2; } .tag.red { background:#d9480f; }
+.toc-back { text-align:right; font-size:13px; margin-top:10px; } .toc-back a { color:var(--muted); text-decoration:none; }
+footer { text-align:center; color:var(--muted); font-size:13px; margin-top:30px; }
+.flow { font-family:"SF Mono",Menlo,Consolas,monospace; font-size:12.5px; }
+.delta { color:#b02a37; font-weight:bold; } .keep { color:#6c757d; }
+.stageblock { border:1px solid #e6e9ec; border-radius:8px; padding:14px 18px; margin:16px 0; background:#fcfdfc; }
+.sample-label { font-family:"SF Mono",Menlo,Consolas,monospace; font-size:12px; color:#1b5e20; font-weight:bold; margin-bottom:2px; margin-top:10px; }
+.variant-label { font-family:"SF Mono",Menlo,Consolas,monospace; font-size:12px; color:#d9480f; font-weight:bold; margin-bottom:2px; margin-top:10px; }
+@media (max-width:760px){ nav ol{columns:1;} } </style>
+</head>
+<body>
+<header>
+  <h1>Granary-v2 学习笔记</h1>
+  <p>论文解读 × NeMo Curator 教程源码逐 Stage 精读 — 各阶段键契约与完整输入输出数据样例</p>
+  <p style="font-size:13px; margin-top:6px;">整理日期：2026-11-16 ｜ 素材：granary-v2.pdf ＋ Curator/tutorials/audio/granary_v2 源码</p>
+</header>
+<div class="container">
+<nav id="toc">
+  <strong>目录</strong>
+  <ol>
+    <li><a href="#s1">论文解读：标题、摘要与双身份</a></li>
+    <li><a href="#s2">三条流水线与数据集输出格式</a></li>
+    <li><a href="#s3">教程目录解读（4 个子教程）</a></li>
+    <li><a href="#s4">metadata 流水线：数据格式</a></li>
+    <li><a href="#s5">indic_asr：11 个 Stage（键契约 + 完整数据样例）</a></li>
+    <li><a href="#s6">indic_asr 关键概念问答</a></li>
+    <li><a href="#s7">text_pipeline：9 个 Stage（键契约 + 完整数据样例）</a></li>
+    <li><a href="#s8">text_pipeline 关键概念问答</a></li>
+    <li><a href="#s9">并发模型与校验闭环</a></li>
+  </ol>
+</nav>
+<section id="s1">
+  <h2>1. 论文解读：标题、摘要与双身份</h2>
+  <h3>标题与摘要（中英对照要点）</h3>
+  <p><strong>标题</strong>：Granary-v2: Scalable Multilingual Speech Data Curation for Predictable and Controllable Model Outputs (Technical Report)<br>
+  <strong>译文</strong>：Granary-v2：面向可预测与可控模型输出的可扩展多语言语音数据治理（技术报告）</p>
+  <table>
+    <tr><th>摘要要点</th><th>内容</th></tr>
+    <tr><td>数据规模</td><td>全量 843,579 小时独立音频、48 语言、19 语料条目、2.134 亿条语句；高质量标记 317,724 小时</td></tr>
+    <tr><td>翻译覆盖</td><td>约 142,778 小时译入英语；约 55,772 小时英语译出至 31 种目标语言</td></tr>
+    <tr><td>系统构成</td><td>基于 NeMo Curator：语言相关 ASR 标注 + 转写改善 + 文本标签生成</td></tr>
+    <tr><td>对齐目标</td><td>忠实语音转写、带/不带非流利的书面形式、语码转换转写、字幕、问答对、翻译</td></tr>
+    <tr><td>过滤实验</td><td>同训练步数预算下，过滤使九基准未加权平均 WER 从 4.91% → 4.67%（六基准提升）</td></tr>
+    <tr><td>开源</td><td>流水线（NeMo Curator tutorials）+ 训练配方开源；HF 公开子集（16 条目 / 463,062 小时）</td></tr>
+  </table>
+  <h3>双身份：流水线 + 数据集</h3>
+  <p>Granary-v2 既指<strong>可复用的数据治理系统</strong>（三条子流水线），也指<strong>该系统产出的数据集</strong>（带标签的 84 万小时音频）。论文中 "uses Granary-v2 as part of its training data" 指数据集那一面。</p>
+  <h3>Nemotron-3.5-Transcribe 的角色（答疑）</h3>
+  <p>不是纯 ASR 模型，而是<strong>语音-语言模型</strong>：约 6 亿参数的 TDT 编码器（从 Granary-v2 预训练检查点初始化，每 80ms 一个表示）+ 投影层 + 语言模型解码器 + 强化学习。<strong>一个模型同时做 ASR 与语音翻译</strong>，用 prompt 控制输出。论文表 12：FLEURS ASR 37 语言 WER/CER 均值 9.29%；FLEURS 翻译 X→英 BLEU 29.20 / 英→X 26.54。</p>
+  <div class="toc-back"><a href="#toc">↑ 返回目录</a></div></section>
+<section id="s2">
+  <h2>2. 三条流水线与数据集输出格式</h2>
+  <h3>三条流水线（论文第 3 节）</h3>
+  <table>
+    <tr><th>流水线</th><th>组成</th><th>产出</th></tr>
+    <tr><td>① 元数据提取</td><td>16kHz 重采样 → 说话人分离（RTTM）→ VAD 切 0.5–40s 段 → 声音事件 → 语言识别</td><td>Opus 片段 + JSONL manifest（说话人数/事件/语言码）</td></tr>
+    <tr><td>② ASR 标注</td><td>语言路由选"主模型 + 恢复模型"对（表 3，48 语言 A–H 组）；或人工转写改进模式</td><td>忠实语音转写（口语数字形式、保留非流利）</td></tr>
+    <tr><td>③ 文本标签生成</td><td>实体恢复→标点→语言验证→TN→[字幕/语码转换/问答]→ITN→去非流利；质量过滤；上下文标签；翻译；指令打包</td><td>对齐的多种文本目标 + 指令-目标对</td></tr>
+  </table>
+  <h3>发布记录 Schema（附录 E 表 18）</h3>
+<pre><code>{
+  "audio_filepath": "…",            // 记录标识符（音频另从原分发方获取）
+  "duration": 8.11, "corpus": "…", "source_lang": "…",
+  "tn_raw": "…",                    // 口语形式转写（共同源）
+  "itn_raw": "…",                   // 书面形式（保留非流利）
+  "itn_clean": "…",                 // 书面形式（无非流利）
+  "captioning_text": "…", "code_switched_text": "…", "speech_qa_text": "Q…A… 或 SKIP",
+  "context_asr": { "coarse": …, "fine_terms": […], "distractors": […], "prompts": [5 变体] },
+  "translations": { "eng": { "translation_raw": …, "translation_quality_score": … } },
+  "preference_instructions": [ { "prompt": …, "target": …, "tags": {"type":…, "target_lang":…} } ],
+  "high_quality": true
+}</code></pre>
+  <div class="note">同一音频的多种转写/翻译只是标签，不增加音频小时数；行粒度 = <strong>VAD 语音段</strong>，全链路从不聚合回父录音（溯源靠 <code>original_file</code>/<code>start_ms</code>/<code>end_ms</code>）。</div>
+  <div class="toc-back"><a href="#toc">↑ 返回目录</a></div></section>
+<section id="s3">
+  <h2>3. 教程目录解读（Curator/tutorials/audio/granary_v2）</h2>
+  <table>
+    <tr><th>教程</th><th>对应论文</th><th>模型</th><th>实测吞吐（Xenna vs Ray Data）</th></tr>
+    <tr><td>metadata/</td><td>流水线①</td><td>Sortformer / Silero / CNN14 / SpeechBrain+Canary+Whisper 三模型 LID</td><td>472 vs 166 音频小时/小时</td></tr>
+    <tr><td>indic_asr/</td><td>流水线② Indic 路由</td><td>Indic Canary（TRT+TRT-LLM）主 + Hindi Parakeet（TRT+RNN-T）恢复</td><td>3604 vs 388 音频小时/小时</td></tr>
+    <tr><td>qwen_omni_asr/</td><td>流水线② 人工转写改进模式</td><td>Qwen3-Omni-30B（vLLM）</td><td>407 vs 228 音频小时/小时</td></tr>
+    <tr><td>text_pipeline/</td><td>流水线③</td><td>Gemma-4-31B-FP8（Dynamo/vLLM 外置服务，4 副本×TP2）</td><td>30.3 vs 12.2 行/秒</td></tr>
+  </table>
+  <div class="note">共同工程设计：统一入口 <code>nemo_curator/config/run.py</code> + Hydra YAML；JSONL manifest 进出；<code>_skipme</code>/<code>additional_notes</code> 不静默丢行；模型/数据按哈希固定；教程规模极小（2 条印地语 / 6 条英语 / 2 行文本）。</div>
+  <div class="toc-back"><a href="#toc">↑ 返回目录</a></div></section>
+<section id="s4">
+  <h2>4. metadata 流水线：数据格式</h2>
+  <h3>输入（每条录音一行）</h3>
+<pre><code>{"audio_filepath": "/data/recording.wav", "audio_item_id": "recording_001"}</code></pre>
+  <h3>输出目录与 JSONL 字段</h3>
+<pre><code>output/ ├── metadata.jsonl  # 每语音段一行 + 无语音审计行
+        ├── audio/          # Opus 片段   ├── rttm/   # 说话人轮次
+        ├── resampled/      # 16kHz WAV   └── speechbrain_cache/</code></pre>
+  <table>
+    <tr><th>字段</th><th>含义</th></tr>
+    <tr><td><code>audio_filepath</code></td><td>Opus 片段绝对路径；<code>vad_empty</code> 审计行保留原录音路径</td></tr>
+    <tr><td><code>original_file</code> / <code>audio_item_id</code></td><td>父录音 / 段级稳定 ID</td></tr>
+    <tr><td><code>start_ms</code> / <code>end_ms</code> / <code>duration</code> / <code>sample_rate</code></td><td>段偏移（毫秒）、段长、16000 Hz</td></tr>
+    <tr><td><code>num_speakers</code> / <code>rttm_filepath</code></td><td>重叠说话人数 / 录音级 RTTM 相对路径</td></tr>
+    <tr><td><code>sed_events</code></td><td>声音事件（相对本段起止秒 + superclass）</td></tr>
+    <tr><td><code>source_lang</code></td><td>选定语言码；缺失为空串；模型不一致为 <code>skipped</code></td></tr>
+    <tr><td><code>additional_notes</code> / <code>_skipme</code> / <code>vad_empty</code></td><td>模型置信度与拒绝原因 / 行级标记 / 无语音审计</td></tr>
+  </table>
+  <div class="toc-back"><a href="#toc">↑ 返回目录</a></div></section>
+<section id="s5">
+  <h2>5. indic_asr：11 个 Stage 逐段精读</h2>
+  <div class="note"><strong>阅读约定</strong>：贯穿示例 = <code>yt1001_seg000000</code>（8.11s 印地语 VAD 段，生产串联场景：metadata 输出直连 ASR 管线）。缩写：<strong>R</strong>=reference_text、<strong>P</strong>=primary_model_prediction（Canary）、<strong>F</strong>=fallback_model_prediction（Parakeet）。每个 Stage 给出<strong>完整输入行</strong>与<strong>完整输出行</strong>（所有字段全列出、无省略，<span class="delta">红色</span>=该阶段新增或变化的字段，灰字为行内注释）；关键变体路径也以完整行快照展示。波形以 <code>&lt;float32 [1, 129760]&gt;</code> 表示内存张量（不落盘）。</div>
+  <p class="flow">S1 读 → S2 校验+波形 → S3 Canary(P) → S4 查P → S5 Parakeet(F) → S6 查F(可救) → S7 选择 → S8 正则清洗 → S9 缩写拼接 → S10 WER → S11 落盘</p>
+<div class="stageblock">
+<h3>Stage 1：ManifestReader <span class="tag gray">纯 CPU</span><span class="tag blue">1:N fan-out</span></h3>
+<table class="keys"><tr><th>读取键</th><td>manifest <strong>文件本身</strong>（不消费行内任何键；音频不解码）</td></tr><tr><th>新增键</th><td><strong>无</strong>——行内容逐字透传进 <code>AudioTask.data</code>；包装层新增 <code>task_id / dataset_name / _metadata / _stage_perf</code>（随行基础设施，不落盘）</td></tr><tr><th>条件写入</th><td>无（可选 <code>include_files</code> 绝对路径过滤 = 断点续跑语义）</td></tr></table><div class="sample-label">输入（manifest.jsonl 一行，完整）：</div>
+<pre><code>{
+  &quot;audio_filepath&quot;: &quot;audio/yt1001_seg000000.opus&quot;,
+  &quot;original_file&quot;: &quot;/data/recordings/yt1001.m4a&quot;,
+  &quot;audio_item_id&quot;: &quot;yt1001_seg000000&quot;,
+  &quot;start_ms&quot;: 310,
+  &quot;end_ms&quot;: 8420,
+  &quot;duration&quot;: 8.11,
+  &quot;sample_rate&quot;: 16000,
+  &quot;num_speakers&quot;: 1,
+  &quot;rttm_filepath&quot;: &quot;rttm/yt1001.rttm&quot;,
+  &quot;sed_events&quot;: [{&quot;label&quot;: &quot;Speech&quot;, &quot;superclass&quot;: &quot;Human sounds&quot;, &quot;start_time&quot;: 0.12, &quot;end_time&quot;: 7.95}],
+  &quot;source_lang&quot;: &quot;hi&quot;,
+  &quot;text&quot;: &quot;आज बाज़ार में बहुत भीड़ थी, मैं जल्दी घर लौट आया&quot;,
+  &quot;additional_notes&quot;: {
+    &amp;quot;SpeechBrainLangID&amp;quot;: &amp;quot;hi (conf=0.99)&amp;quot;,
+    &amp;quot;language_decision&amp;quot;: &amp;quot;all-3-agree&amp;quot;
+  },
+  &quot;_skipme&quot;: &quot;lang_rejected_by_lid&quot;,
+  &quot;vad_empty&quot;: false
+}</code></pre><div class="sample-label">输出（AudioTask.data，完整——与输入逐字相同）：</div>
+<pre><code>{
+  &quot;audio_filepath&quot;: &quot;audio/yt1001_seg000000.opus&quot;,
+  &quot;original_file&quot;: &quot;/data/recordings/yt1001.m4a&quot;,
+  &quot;audio_item_id&quot;: &quot;yt1001_seg000000&quot;,
+  &quot;start_ms&quot;: 310,
+  &quot;end_ms&quot;: 8420,
+  &quot;duration&quot;: 8.11,
+  &quot;sample_rate&quot;: 16000,
+  &quot;num_speakers&quot;: 1,
+  &quot;rttm_filepath&quot;: &quot;rttm/yt1001.rttm&quot;,
+  &quot;sed_events&quot;: [{&quot;label&quot;: &quot;Speech&quot;, &quot;superclass&quot;: &quot;Human sounds&quot;, &quot;start_time&quot;: 0.12, &quot;end_time&quot;: 7.95}],
+  &quot;source_lang&quot;: &quot;hi&quot;,
+  &quot;text&quot;: &quot;आज बाज़ार में बहुत भीड़ थी, मैं जल्दी घर लौट आया&quot;,
+  &quot;additional_notes&quot;: {
+    &amp;quot;SpeechBrainLangID&amp;quot;: &amp;quot;hi (conf=0.99)&amp;quot;,
+    &amp;quot;language_decision&amp;quot;: &amp;quot;all-3-agree&amp;quot;
+  },
+  &quot;_skipme&quot;: &quot;lang_rejected_by_lid&quot;,
+  &quot;vad_empty&quot;: false
+}</code></pre><p class="keep">包装层注记：task_id=""（框架在后续 stage 边界赋确定性 ID）；dataset_name="indic_asr"；_metadata={"partition_index":0,"total_partitions":1,"source_files":[...]}（同分区各行共享引用）；_stage_perf=[]（行级计时，拷贝）——四者均不进最终 JSONL。</p></div>
+<div class="stageblock">
+<h3>Stage 2：PrepareIndicASRInputStage <span class="tag gray">纯 CPU</span><span class="tag blue">1:1</span><span class="tag red">硬校验</span></h3>
+<table class="keys"><tr><th>读取键</th><td><code>text</code>（弹出）、<code>audio_item_id</code>、<code>source_lang</code>（必须 "hi"）、<code>duration</code>（与实测 ≤1ms）、<code>audio_filepath</code></td></tr><tr><th>新增键</th><td><code>reference_text</code>、<code>granary_v1_prediction</code>（同一参考两份）、<code>sampling_rate</code>、<code>waveform</code>（内存字段）、<code>_skipme=""</code></td></tr><tr><th>改写键</th><td><code>audio_filepath</code>（绝对化）、<code>additional_notes</code>（合并追加模型标签）、<code>_skipme</code>（重置清空）</td></tr><tr><th>删除键</th><td><code>text</code></td></tr></table><div class="sample-label">输入 = Stage 1 输出（上方完整行原样流入）：</div>
+<pre><code>{
+  &quot;audio_filepath&quot;: &quot;audio/yt1001_seg000000.opus&quot;,
+  &quot;original_file&quot;: &quot;/data/recordings/yt1001.m4a&quot;,
+  &quot;audio_item_id&quot;: &quot;yt1001_seg000000&quot;,
+  &quot;start_ms&quot;: 310,
+  &quot;end_ms&quot;: 8420,
+  &quot;duration&quot;: 8.11,
+  &quot;sample_rate&quot;: 16000,
+  &quot;num_speakers&quot;: 1,
+  &quot;rttm_filepath&quot;: &quot;rttm/yt1001.rttm&quot;,
+  &quot;sed_events&quot;: [{&quot;label&quot;: &quot;Speech&quot;, &quot;superclass&quot;: &quot;Human sounds&quot;, &quot;start_time&quot;: 0.12, &quot;end_time&quot;: 7.95}],
+  &quot;source_lang&quot;: &quot;hi&quot;,
+  &quot;text&quot;: &quot;आज बाज़ार में बहुत भीड़ थी, मैं जल्दी घर लौट आया&quot;,
+  &quot;additional_notes&quot;: {
+    &amp;quot;SpeechBrainLangID&amp;quot;: &amp;quot;hi (conf=0.99)&amp;quot;,
+    &amp;quot;language_decision&amp;quot;: &amp;quot;all-3-agree&amp;quot;
+  },
+  &quot;_skipme&quot;: &quot;lang_rejected_by_lid&quot;,
+  &quot;vad_empty&quot;: false
+}</code></pre><div class="sample-label">输出（完整行，红 = 新增/变化）：</div>
+<pre><code>{
+<span class="delta">  &quot;audio_filepath&quot;: &quot;/data/indic_asr/audio/yt1001_seg000000.opus&quot;,</span>   <span class="keep">← 绝对化解析</span>
+  &quot;original_file&quot;: &quot;/data/recordings/yt1001.m4a&quot;,
+  &quot;audio_item_id&quot;: &quot;yt1001_seg000000&quot;,
+  &quot;start_ms&quot;: 310,
+  &quot;end_ms&quot;: 8420,
+  &quot;duration&quot;: 8.11,
+  &quot;sample_rate&quot;: 16000,
+  &quot;num_speakers&quot;: 1,
+  &quot;rttm_filepath&quot;: &quot;rttm/yt1001.rttm&quot;,
+  &quot;sed_events&quot;: [{&quot;label&quot;: &quot;Speech&quot;, &quot;superclass&quot;: &quot;Human sounds&quot;, &quot;start_time&quot;: 0.12, &quot;end_time&quot;: 7.95}],
+  &quot;source_lang&quot;: &quot;hi&quot;,
+  &quot;additional_notes&quot;: {
+    &amp;quot;SpeechBrainLangID&amp;quot;: &amp;quot;hi (conf=0.99)&amp;quot;,
+    &amp;quot;language_decision&amp;quot;: &amp;quot;all-3-agree&amp;quot;,
+&lt;span class=&quot;delta&quot;&gt;    &amp;quot;primary_model&amp;quot;: &amp;quot;indic_canary&amp;quot;,&lt;/span&gt;
+&lt;span class=&quot;delta&quot;&gt;    &amp;quot;recovery_model&amp;quot;: &amp;quot;parakeet_riva&amp;quot;&lt;/span&gt;
+  },
+<span class="delta">  &quot;_skipme&quot;: &quot;&quot;,</span>   <span class="keep">← 旧标记被重置</span>
+  &quot;vad_empty&quot;: false,
+<span class="delta">  &quot;reference_text&quot;: &quot;आज बाज़ार में बहुत भीड़ थी, मैं जल्दी घर लौट आया&quot;,</span>   <span class="keep">← text 弹出转存</span>
+<span class="delta">  &quot;granary_v1_prediction&quot;: &quot;आज बाज़ार में बहुत भीड़ थी, मैं जल्दी घर लौट आया&quot;,</span>   <span class="keep">← 同一参考第二份</span>
+<span class="delta">  &quot;sampling_rate&quot;: 16000,</span>   <span class="keep">← 解码实测采样率</span>
+<span class="delta">  &quot;waveform&quot;: &quot;&lt;float32 [1, 129760]&gt;&quot;</span>   <span class="keep">← 8.11s×16000，内存字段</span>
+<span class="keep">  // "text" 键已删除</span>
+}</code></pre><div class="warn">六道硬校验任一失败 = <strong>异常</strong>（非软标记）：text 空 / id 空 / 语言≠hi / 文件缺失 / 非 16kHz 单声道 / 时长偏差 &gt;1ms。</div></div>
+<div class="stageblock">
+<h3>Stage 3：InferenceIndicCanaryStage（主 ASR） <span class="tag">GPU</span><span class="tag blue">1:1</span></h3>
+<table class="keys"><tr><th>读取键</th><td><code>waveform</code> + <code>sampling_rate</code>（内存直取推理）、<code>source_lang</code>（→ "Hindi" 提示）</td></tr><tr><th>新增键</th><td><code>primary_model_prediction</code>（P）、<code>asr_language</code></td></tr><tr><th>条件写入</th><td><code>_skipme</code>（仅语言不支持时，教程不可达）、<code>additional_notes</code>（仅 &gt;40s 截断时）</td></tr><tr><th>保留</th><td><code>waveform</code>（keep_waveform:true，传给 Stage 5）</td></tr></table><div class="sample-label">输入 = Stage 2 输出（上方完整行原样流入）：</div>
+<pre><code>{
+  &quot;audio_filepath&quot;: &quot;/data/indic_asr/audio/yt1001_seg000000.opus&quot;,
+  &quot;original_file&quot;: &quot;/data/recordings/yt1001.m4a&quot;,
+  &quot;audio_item_id&quot;: &quot;yt1001_seg000000&quot;,
+  &quot;start_ms&quot;: 310,
+  &quot;end_ms&quot;: 8420,
+  &quot;duration&quot;: 8.11,
+  &quot;sample_rate&quot;: 16000,
+  &quot;num_speakers&quot;: 1,
+  &quot;rttm_filepath&quot;: &quot;rttm/yt1001.rttm&quot;,
+  &quot;sed_events&quot;: [{&quot;label&quot;: &quot;Speech&quot;, &quot;superclass&quot;: &quot;Human sounds&quot;, &quot;start_time&quot;: 0.12, &quot;end_time&quot;: 7.95}],
+  &quot;source_lang&quot;: &quot;hi&quot;,
+  &quot;additional_notes&quot;: {
+    &amp;quot;SpeechBrainLangID&amp;quot;: &amp;quot;hi (conf=0.99)&amp;quot;,
+    &amp;quot;language_decision&amp;quot;: &amp;quot;all-3-agree&amp;quot;,
+    &amp;quot;primary_model&amp;quot;: &amp;quot;indic_canary&amp;quot;,
+    &amp;quot;recovery_model&amp;quot;: &amp;quot;parakeet_riva&amp;quot;
+  },
+  &quot;_skipme&quot;: &quot;&quot;,
+  &quot;vad_empty&quot;: false,
+  &quot;reference_text&quot;: &quot;आज बाज़ार में बहुत भीड़ थी, मैं जल्दी घर लौट आया&quot;,
+  &quot;granary_v1_prediction&quot;: &quot;आज बाज़ार में बहुत भीड़ थी, मैं जल्दी घर लौट आया&quot;,
+  &quot;sampling_rate&quot;: 16000,
+  &quot;waveform&quot;: &quot;&lt;float32 [1, 129760]&gt;&quot;
+}</code></pre><div class="sample-label">输出（完整行）：</div>
+<pre><code>{
+  &quot;audio_filepath&quot;: &quot;/data/indic_asr/audio/yt1001_seg000000.opus&quot;,
+  &quot;original_file&quot;: &quot;/data/recordings/yt1001.m4a&quot;,
+  &quot;audio_item_id&quot;: &quot;yt1001_seg000000&quot;,
+  &quot;start_ms&quot;: 310,
+  &quot;end_ms&quot;: 8420,
+  &quot;duration&quot;: 8.11,
+  &quot;sample_rate&quot;: 16000,
+  &quot;num_speakers&quot;: 1,
+  &quot;rttm_filepath&quot;: &quot;rttm/yt1001.rttm&quot;,
+  &quot;sed_events&quot;: [{&quot;label&quot;: &quot;Speech&quot;, &quot;superclass&quot;: &quot;Human sounds&quot;, &quot;start_time&quot;: 0.12, &quot;end_time&quot;: 7.95}],
+  &quot;source_lang&quot;: &quot;hi&quot;,
+  &quot;additional_notes&quot;: {
+    &amp;quot;SpeechBrainLangID&amp;quot;: &amp;quot;hi (conf=0.99)&amp;quot;,
+    &amp;quot;language_decision&amp;quot;: &amp;quot;all-3-agree&amp;quot;,
+    &amp;quot;primary_model&amp;quot;: &amp;quot;indic_canary&amp;quot;,
+    &amp;quot;recovery_model&amp;quot;: &amp;quot;parakeet_riva&amp;quot;
+  },
+  &quot;_skipme&quot;: &quot;&quot;,
+  &quot;vad_empty&quot;: false,
+  &quot;reference_text&quot;: &quot;आज बाज़ार में बहुत भीड़ थी, मैं जल्दी घर लौट आया&quot;,
+  &quot;granary_v1_prediction&quot;: &quot;आज बाज़ार में बहुत भीड़ थी, मैं जल्दी घर लौट आया&quot;,
+  &quot;sampling_rate&quot;: 16000,
+  &quot;waveform&quot;: &quot;&lt;float32 [1, 129760]&gt;&quot;,
+<span class="delta">  &quot;primary_model_prediction&quot;: &quot;आज बाजार में बहुत भीड थी मैं जल्दी घर लौट आया&quot;,</span>   <span class="keep">← P（pnc=false：无标点无大小写）</span>
+<span class="delta">  &quot;asr_language&quot;: &quot;hi&quot;</span>   <span class="keep">← 模型自报语言码</span>
+}</code></pre><p>TRT 编码器 + TRT-LLM 解码器，4 beam、≤347 新 token；批 64、8 worker、50 GiB/worker（每 H100 一个 Canary）；成功路径零注记。</p></div>
+<div class="stageblock">
+<h3>Stage 4：WhisperHallucinationStage（primary 检查） <span class="tag gray">纯 CPU · 规则式</span></h3>
+<table class="keys"><tr><th>读取键</th><td><code>primary_model_prediction</code>（检查对象）、<code>duration</code>（字符率分母）、<code>source_lang</code>（连写/黏着例外）</td></tr><tr><th>必写注记</th><td><code>WhisperHallucination_primary</code> ∈ {passed / hallucination (原因) / skipped (flagged) / skipped (empty text)}</td></tr><tr><th>条件写入</th><td><code>_skipme = "Hallucination:WhisperHallucination_primary"</code>（四项任一命中：复读唯一词比≤0.4 / 超长词≥25 / 短语表 101 条 / 字符率&gt;40）</td></tr><tr><th>不动</th><td>P 文本本身（不删不改一字）</td></tr></table><div class="sample-label">输入 = Stage 3 输出（上方完整行原样流入）。核对：约 52 字符 / 8.11s ≈ 6.4 字符/秒 &lt; 40；唯一词比 11/11=1.0 → 四项全过：</div>
+<pre><code>{
+  &quot;audio_filepath&quot;: &quot;/data/indic_asr/audio/yt1001_seg000000.opus&quot;,
+  &quot;original_file&quot;: &quot;/data/recordings/yt1001.m4a&quot;,
+  &quot;audio_item_id&quot;: &quot;yt1001_seg000000&quot;,
+  &quot;start_ms&quot;: 310,
+  &quot;end_ms&quot;: 8420,
+  &quot;duration&quot;: 8.11,
+  &quot;sample_rate&quot;: 16000,
+  &quot;num_speakers&quot;: 1,
+  &quot;rttm_filepath&quot;: &quot;rttm/yt1001.rttm&quot;,
+  &quot;sed_events&quot;: [{&quot;label&quot;: &quot;Speech&quot;, &quot;superclass&quot;: &quot;Human sounds&quot;, &quot;start_time&quot;: 0.12, &quot;end_time&quot;: 7.95}],
+  &quot;source_lang&quot;: &quot;hi&quot;,
+  &quot;additional_notes&quot;: {
+    &amp;quot;SpeechBrainLangID&amp;quot;: &amp;quot;hi (conf=0.99)&amp;quot;,
+    &amp;quot;language_decision&amp;quot;: &amp;quot;all-3-agree&amp;quot;,
+    &amp;quot;primary_model&amp;quot;: &amp;quot;indic_canary&amp;quot;,
+    &amp;quot;recovery_model&amp;quot;: &amp;quot;parakeet_riva&amp;quot;
+  },
+  &quot;_skipme&quot;: &quot;&quot;,
+  &quot;vad_empty&quot;: false,
+  &quot;reference_text&quot;: &quot;आज बाज़ार में बहुत भीड़ थी, मैं जल्दी घर लौट आया&quot;,
+  &quot;granary_v1_prediction&quot;: &quot;आज बाज़ार में बहुत भीड़ थी, मैं जल्दी घर लौट आया&quot;,
+  &quot;sampling_rate&quot;: 16000,
+  &quot;waveform&quot;: &quot;&lt;float32 [1, 129760]&gt;&quot;,
+  &quot;primary_model_prediction&quot;: &quot;आज बाजार में बहुत भीड थी मैं जल्दी घर लौट आया&quot;,
+  &quot;asr_language&quot;: &quot;hi&quot;
+}</code></pre><div class="sample-label">输出（完整行，通过路径）：</div>
+<pre><code>{
+  &quot;audio_filepath&quot;: &quot;/data/indic_asr/audio/yt1001_seg000000.opus&quot;,
+  &quot;original_file&quot;: &quot;/data/recordings/yt1001.m4a&quot;,
+  &quot;audio_item_id&quot;: &quot;yt1001_seg000000&quot;,
+  &quot;start_ms&quot;: 310,
+  &quot;end_ms&quot;: 8420,
+  &quot;duration&quot;: 8.11,
+  &quot;sample_rate&quot;: 16000,
+  &quot;num_speakers&quot;: 1,
+  &quot;rttm_filepath&quot;: &quot;rttm/yt1001.rttm&quot;,
+  &quot;sed_events&quot;: [{&quot;label&quot;: &quot;Speech&quot;, &quot;superclass&quot;: &quot;Human sounds&quot;, &quot;start_time&quot;: 0.12, &quot;end_time&quot;: 7.95}],
+  &quot;source_lang&quot;: &quot;hi&quot;,
+  &quot;additional_notes&quot;: {
+    &amp;quot;SpeechBrainLangID&amp;quot;: &amp;quot;hi (conf=0.99)&amp;quot;,
+    &amp;quot;language_decision&amp;quot;: &amp;quot;all-3-agree&amp;quot;,
+    &amp;quot;primary_model&amp;quot;: &amp;quot;indic_canary&amp;quot;,
+    &amp;quot;recovery_model&amp;quot;: &amp;quot;parakeet_riva&amp;quot;,
+&lt;span class=&quot;delta&quot;&gt;    &amp;quot;WhisperHallucination_primary&amp;quot;: &amp;quot;passed&amp;quot;&lt;/span&gt;
+  },
+  &quot;_skipme&quot;: &quot;&quot;,
+  &quot;vad_empty&quot;: false,
+  &quot;reference_text&quot;: &quot;आज बाज़ार में बहुत भीड़ थी, मैं जल्दी घर लौट आया&quot;,
+  &quot;granary_v1_prediction&quot;: &quot;आज बाज़ार में बहुत भीड़ थी, मैं जल्दी घर लौट आया&quot;,
+  &quot;sampling_rate&quot;: 16000,
+  &quot;waveform&quot;: &quot;&lt;float32 [1, 129760]&gt;&quot;,
+  &quot;primary_model_prediction&quot;: &quot;आज बाजार में बहुत भीड थी मैं जल्दी घर लौट आया&quot;,
+  &quot;asr_language&quot;: &quot;hi&quot;
+}</code></pre><div class="variant-label">变体快照（命中路径——P 为复读文本，唯一词比 2/8=0.25 ≤ 0.4，完整行）：</div>
+<pre><code>{
+  &quot;audio_filepath&quot;: &quot;/data/indic_asr/audio/yt1001_seg000000.opus&quot;,
+  &quot;original_file&quot;: &quot;/data/recordings/yt1001.m4a&quot;,
+  &quot;audio_item_id&quot;: &quot;yt1001_seg000000&quot;,
+  &quot;start_ms&quot;: 310,
+  &quot;end_ms&quot;: 8420,
+  &quot;duration&quot;: 8.11,
+  &quot;sample_rate&quot;: 16000,
+  &quot;num_speakers&quot;: 1,
+  &quot;rttm_filepath&quot;: &quot;rttm/yt1001.rttm&quot;,
+  &quot;sed_events&quot;: [{&quot;label&quot;: &quot;Speech&quot;, &quot;superclass&quot;: &quot;Human sounds&quot;, &quot;start_time&quot;: 0.12, &quot;end_time&quot;: 7.95}],
+  &quot;source_lang&quot;: &quot;hi&quot;,
+  &quot;additional_notes&quot;: {
+    &amp;quot;SpeechBrainLangID&amp;quot;: &amp;quot;hi (conf=0.99)&amp;quot;,
+    &amp;quot;language_decision&amp;quot;: &amp;quot;all-3-agree&amp;quot;,
+    &amp;quot;primary_model&amp;quot;: &amp;quot;indic_canary&amp;quot;,
+    &amp;quot;recovery_model&amp;quot;: &amp;quot;parakeet_riva&amp;quot;,
+&lt;span class=&quot;delta&quot;&gt;    &amp;quot;WhisperHallucination_primary&amp;quot;: &amp;quot;hallucination (repeated_ngrams)&amp;quot;&lt;/span&gt;
+  },
+<span class="delta">  &quot;_skipme&quot;: &quot;Hallucination:WhisperHallucination_primary&quot;,</span>   <span class="keep">← 软标记，行保留</span>
+  &quot;vad_empty&quot;: false,
+  &quot;reference_text&quot;: &quot;आज बाज़ार में बहुत भीड़ थी, मैं जल्दी घर लौट आया&quot;,
+  &quot;granary_v1_prediction&quot;: &quot;आज बाज़ार में बहुत भीड़ थी, मैं जल्दी घर लौट आया&quot;,
+  &quot;sampling_rate&quot;: 16000,
+  &quot;waveform&quot;: &quot;&lt;float32 [1, 129760]&gt;&quot;,
+<span class="delta">  &quot;primary_model_prediction&quot;: &quot;आज बाजार आज बाजार आज बाजार आज बाजार&quot;,</span>   <span class="keep">← 复读文本不删不改</span>
+  &quot;asr_language&quot;: &quot;hi&quot;
+}</code></pre></div>
+<div class="stageblock">
+<h3>Stage 5：InferenceParakeetStage（恢复 ASR） <span class="tag">GPU</span><span class="tag blue">1:1</span></h3>
+<table class="keys"><tr><th>读取键</th><td><code>waveform</code> + <code>sampling_rate</code>（内存复用，<strong>每条有效音频都跑</strong>）、<code>source_lang</code>（门控 ∈ [hi]）</td></tr><tr><th>新增键</th><td><code>fallback_model_prediction</code>（F）</td></tr><tr><th>删除键</th><td><code>waveform</code>（keep_waveform:false —— 生命周期 S2 生 → S3 借 → S5 释）</td></tr><tr><th>条件写入</th><td>非印地语：F="" + 注记 lang_not_supported:xx（不写 _skipme；教程不可达）</td></tr></table><div class="sample-label">输入 = Stage 4 输出（通过路径完整行原样流入）：</div>
+<pre><code>{
+  &quot;audio_filepath&quot;: &quot;/data/indic_asr/audio/yt1001_seg000000.opus&quot;,
+  &quot;original_file&quot;: &quot;/data/recordings/yt1001.m4a&quot;,
+  &quot;audio_item_id&quot;: &quot;yt1001_seg000000&quot;,
+  &quot;start_ms&quot;: 310,
+  &quot;end_ms&quot;: 8420,
+  &quot;duration&quot;: 8.11,
+  &quot;sample_rate&quot;: 16000,
+  &quot;num_speakers&quot;: 1,
+  &quot;rttm_filepath&quot;: &quot;rttm/yt1001.rttm&quot;,
+  &quot;sed_events&quot;: [{&quot;label&quot;: &quot;Speech&quot;, &quot;superclass&quot;: &quot;Human sounds&quot;, &quot;start_time&quot;: 0.12, &quot;end_time&quot;: 7.95}],
+  &quot;source_lang&quot;: &quot;hi&quot;,
+  &quot;additional_notes&quot;: {
+    &amp;quot;SpeechBrainLangID&amp;quot;: &amp;quot;hi (conf=0.99)&amp;quot;,
+    &amp;quot;language_decision&amp;quot;: &amp;quot;all-3-agree&amp;quot;,
+    &amp;quot;primary_model&amp;quot;: &amp;quot;indic_canary&amp;quot;,
+    &amp;quot;recovery_model&amp;quot;: &amp;quot;parakeet_riva&amp;quot;,
+    &amp;quot;WhisperHallucination_primary&amp;quot;: &amp;quot;passed&amp;quot;
+  },
+  &quot;_skipme&quot;: &quot;&quot;,
+  &quot;vad_empty&quot;: false,
+  &quot;reference_text&quot;: &quot;आज बाज़ार में बहुत भीड़ थी, मैं जल्दी घर लौट आया&quot;,
+  &quot;granary_v1_prediction&quot;: &quot;आज बाज़ार में बहुत भीड़ थी, मैं जल्दी घर लौट आया&quot;,
+  &quot;sampling_rate&quot;: 16000,
+  &quot;waveform&quot;: &quot;&lt;float32 [1, 129760]&gt;&quot;,
+  &quot;primary_model_prediction&quot;: &quot;आज बाजार में बहुत भीड थी मैं जल्दी घर लौट आया&quot;,
+  &quot;asr_language&quot;: &quot;hi&quot;
+}</code></pre><div class="sample-label">输出（完整行）：</div>
+<pre><code>{
+  &quot;audio_filepath&quot;: &quot;/data/indic_asr/audio/yt1001_seg000000.opus&quot;,
+  &quot;original_file&quot;: &quot;/data/recordings/yt1001.m4a&quot;,
+  &quot;audio_item_id&quot;: &quot;yt1001_seg000000&quot;,
+  &quot;start_ms&quot;: 310,
+  &quot;end_ms&quot;: 8420,
+  &quot;duration&quot;: 8.11,
+  &quot;sample_rate&quot;: 16000,
+  &quot;num_speakers&quot;: 1,
+  &quot;rttm_filepath&quot;: &quot;rttm/yt1001.rttm&quot;,
+  &quot;sed_events&quot;: [{&quot;label&quot;: &quot;Speech&quot;, &quot;superclass&quot;: &quot;Human sounds&quot;, &quot;start_time&quot;: 0.12, &quot;end_time&quot;: 7.95}],
+  &quot;source_lang&quot;: &quot;hi&quot;,
+  &quot;additional_notes&quot;: {
+    &amp;quot;SpeechBrainLangID&amp;quot;: &amp;quot;hi (conf=0.99)&amp;quot;,
+    &amp;quot;language_decision&amp;quot;: &amp;quot;all-3-agree&amp;quot;,
+    &amp;quot;primary_model&amp;quot;: &amp;quot;indic_canary&amp;quot;,
+    &amp;quot;recovery_model&amp;quot;: &amp;quot;parakeet_riva&amp;quot;,
+    &amp;quot;WhisperHallucination_primary&amp;quot;: &amp;quot;passed&amp;quot;
+  },
+  &quot;_skipme&quot;: &quot;&quot;,
+  &quot;vad_empty&quot;: false,
+  &quot;reference_text&quot;: &quot;आज बाज़ार में बहुत भीड़ थी, मैं जल्दी घर लौट आया&quot;,
+  &quot;granary_v1_prediction&quot;: &quot;आज बाज़ार में बहुत भीड़ थी, मैं जल्दी घर लौट आया&quot;,
+  &quot;sampling_rate&quot;: 16000,
+  &quot;primary_model_prediction&quot;: &quot;आज बाजार में बहुत भीड थी मैं जल्दी घर लौट आया&quot;,
+  &quot;asr_language&quot;: &quot;hi&quot;,
+<span class="delta">  &quot;fallback_model_prediction&quot;: &quot;आज बाजार में बहुत भीड़ थी मैं जल्दी घर लौट आया।&quot;</span>   <span class="keep">← F（RNN-T 风格，句末 danda）</span>
+<span class="keep">  // "waveform" 键已删除</span>
+}</code></pre><p>架构去相关（TRT-LLM vs RNN-T）→ 失败模式不同 → 一致性比较有信息量；24 GiB/worker，每 H100 装 1×Canary + 1×Parakeet。</p></div>
+<div class="stageblock">
+<h3>Stage 6：WhisperHallucinationStage（recovery 复核） <span class="tag gray">纯 CPU · 规则式</span></h3>
+<table class="keys"><tr><th>读取键</th><td><code>fallback_model_prediction</code>（检查对象）、<code>duration</code>、<code>source_lang</code></td></tr><tr><th>必写注记</th><td><code>WhisperHallucination_asr</code> ∈ {passed / hallucination (…) / <strong>recovered:asr</strong> / skipped (empty text)}</td></tr><tr><th>条件写/清</th><td>F 干净 + 旧标记为 Hallucination 家族 → <strong>清空 _skipme</strong>；F 命中 → 覆盖为 <code>Hallucination:…_asr</code>；非 Hallucination 标记永不覆盖</td></tr></table><div class="sample-label">输入 = Stage 5 输出（上方完整行原样流入）。本例 F 四项全过：</div>
+<pre><code>{
+  &quot;audio_filepath&quot;: &quot;/data/indic_asr/audio/yt1001_seg000000.opus&quot;,
+  &quot;original_file&quot;: &quot;/data/recordings/yt1001.m4a&quot;,
+  &quot;audio_item_id&quot;: &quot;yt1001_seg000000&quot;,
+  &quot;start_ms&quot;: 310,
+  &quot;end_ms&quot;: 8420,
+  &quot;duration&quot;: 8.11,
+  &quot;sample_rate&quot;: 16000,
+  &quot;num_speakers&quot;: 1,
+  &quot;rttm_filepath&quot;: &quot;rttm/yt1001.rttm&quot;,
+  &quot;sed_events&quot;: [{&quot;label&quot;: &quot;Speech&quot;, &quot;superclass&quot;: &quot;Human sounds&quot;, &quot;start_time&quot;: 0.12, &quot;end_time&quot;: 7.95}],
+  &quot;source_lang&quot;: &quot;hi&quot;,
+  &quot;additional_notes&quot;: {
+    &amp;quot;SpeechBrainLangID&amp;quot;: &amp;quot;hi (conf=0.99)&amp;quot;,
+    &amp;quot;language_decision&amp;quot;: &amp;quot;all-3-agree&amp;quot;,
+    &amp;quot;primary_model&amp;quot;: &amp;quot;indic_canary&amp;quot;,
+    &amp;quot;recovery_model&amp;quot;: &amp;quot;parakeet_riva&amp;quot;,
+    &amp;quot;WhisperHallucination_primary&amp;quot;: &amp;quot;passed&amp;quot;
+  },
+  &quot;_skipme&quot;: &quot;&quot;,
+  &quot;vad_empty&quot;: false,
+  &quot;reference_text&quot;: &quot;आज बाज़ार में बहुत भीड़ थी, मैं जल्दी घर लौट आया&quot;,
+  &quot;granary_v1_prediction&quot;: &quot;आज बाज़ार में बहुत भीड़ थी, मैं जल्दी घर लौट आया&quot;,
+  &quot;sampling_rate&quot;: 16000,
+  &quot;primary_model_prediction&quot;: &quot;आज बाजार में बहुत भीड थी मैं जल्दी घर लौट आया&quot;,
+  &quot;asr_language&quot;: &quot;hi&quot;,
+  &quot;fallback_model_prediction&quot;: &quot;आज बाजार में बहुत भीड़ थी मैं जल्दी घर लौट आया।&quot;
+}</code></pre><div class="sample-label">输出（完整行，通过路径）：</div>
+<pre><code>{
+  &quot;audio_filepath&quot;: &quot;/data/indic_asr/audio/yt1001_seg000000.opus&quot;,
+  &quot;original_file&quot;: &quot;/data/recordings/yt1001.m4a&quot;,
+  &quot;audio_item_id&quot;: &quot;yt1001_seg000000&quot;,
+  &quot;start_ms&quot;: 310,
+  &quot;end_ms&quot;: 8420,
+  &quot;duration&quot;: 8.11,
+  &quot;sample_rate&quot;: 16000,
+  &quot;num_speakers&quot;: 1,
+  &quot;rttm_filepath&quot;: &quot;rttm/yt1001.rttm&quot;,
+  &quot;sed_events&quot;: [{&quot;label&quot;: &quot;Speech&quot;, &quot;superclass&quot;: &quot;Human sounds&quot;, &quot;start_time&quot;: 0.12, &quot;end_time&quot;: 7.95}],
+  &quot;source_lang&quot;: &quot;hi&quot;,
+  &quot;additional_notes&quot;: {
+    &amp;quot;SpeechBrainLangID&amp;quot;: &amp;quot;hi (conf=0.99)&amp;quot;,
+    &amp;quot;language_decision&amp;quot;: &amp;quot;all-3-agree&amp;quot;,
+    &amp;quot;primary_model&amp;quot;: &amp;quot;indic_canary&amp;quot;,
+    &amp;quot;recovery_model&amp;quot;: &amp;quot;parakeet_riva&amp;quot;,
+    &amp;quot;WhisperHallucination_primary&amp;quot;: &amp;quot;passed&amp;quot;,
+&lt;span class=&quot;delta&quot;&gt;    &amp;quot;WhisperHallucination_asr&amp;quot;: &amp;quot;passed&amp;quot;&lt;/span&gt;
+  },
+  &quot;_skipme&quot;: &quot;&quot;,
+  &quot;vad_empty&quot;: false,
+  &quot;reference_text&quot;: &quot;आज बाज़ार में बहुत भीड़ थी, मैं जल्दी घर लौट आया&quot;,
+  &quot;granary_v1_prediction&quot;: &quot;आज बाज़ार में बहुत भीड़ थी, मैं जल्दी घर लौट आया&quot;,
+  &quot;sampling_rate&quot;: 16000,
+  &quot;primary_model_prediction&quot;: &quot;आज बाजार में बहुत भीड थी मैं जल्दी घर लौट आया&quot;,
+  &quot;asr_language&quot;: &quot;hi&quot;,
+  &quot;fallback_model_prediction&quot;: &quot;आज बाजार में बहुत भीड़ थी मैं जल्दी घर लौट आया।&quot;
+}</code></pre><div class="variant-label">变体快照（救回路径——S4 曾标记复读 P、F 干净，完整行）：</div>
+<pre><code>{
+  &quot;audio_filepath&quot;: &quot;/data/indic_asr/audio/yt1001_seg000000.opus&quot;,
+  &quot;original_file&quot;: &quot;/data/recordings/yt1001.m4a&quot;,
+  &quot;audio_item_id&quot;: &quot;yt1001_seg000000&quot;,
+  &quot;start_ms&quot;: 310,
+  &quot;end_ms&quot;: 8420,
+  &quot;duration&quot;: 8.11,
+  &quot;sample_rate&quot;: 16000,
+  &quot;num_speakers&quot;: 1,
+  &quot;rttm_filepath&quot;: &quot;rttm/yt1001.rttm&quot;,
+  &quot;sed_events&quot;: [{&quot;label&quot;: &quot;Speech&quot;, &quot;superclass&quot;: &quot;Human sounds&quot;, &quot;start_time&quot;: 0.12, &quot;end_time&quot;: 7.95}],
+  &quot;source_lang&quot;: &quot;hi&quot;,
+  &quot;additional_notes&quot;: {
+    &amp;quot;SpeechBrainLangID&amp;quot;: &amp;quot;hi (conf=0.99)&amp;quot;,
+    &amp;quot;language_decision&amp;quot;: &amp;quot;all-3-agree&amp;quot;,
+    &amp;quot;primary_model&amp;quot;: &amp;quot;indic_canary&amp;quot;,
+    &amp;quot;recovery_model&amp;quot;: &amp;quot;parakeet_riva&amp;quot;,
+    &amp;quot;WhisperHallucination_primary&amp;quot;: &amp;quot;hallucination (repeated_ngrams)&amp;quot;,
+&lt;span class=&quot;delta&quot;&gt;    &amp;quot;WhisperHallucination_asr&amp;quot;: &amp;quot;recovered:asr&amp;quot;&lt;/span&gt;
+  },
+<span class="delta">  &quot;_skipme&quot;: &quot;&quot;,</span>   <span class="keep">← 被清除（Stage 7 换人信号）</span>
+  &quot;vad_empty&quot;: false,
+  &quot;reference_text&quot;: &quot;आज बाज़ार में बहुत भीड़ थी, मैं जल्दी घर लौट आया&quot;,
+  &quot;granary_v1_prediction&quot;: &quot;आज बाज़ार में बहुत भीड़ थी, मैं जल्दी घर लौट आया&quot;,
+  &quot;sampling_rate&quot;: 16000,
+  &quot;primary_model_prediction&quot;: &quot;आज बाजार आज बाजार आज बाजार आज बाजार&quot;,
+  &quot;asr_language&quot;: &quot;hi&quot;,
+  &quot;fallback_model_prediction&quot;: &quot;आज बाजार में बहुत भीड़ थी मैं जल्दी घर लौट आया।&quot;
+}</code></pre></div>
+<div class="stageblock">
+<h3>Stage 7：SelectBestPredictionStage（选择） <span class="tag gray">纯 CPU</span></h3>
+<table class="keys"><tr><th>读取键</th><td><code>primary_model_prediction</code>、<code>fallback_model_prediction</code>、<code>additional_notes</code>（扫 "recovered"/"lang_not_supported" 子串）、<code>source_lang</code>（WER/CER 选择）、<code>granary_v1_prediction</code>（参考分支，教程关闭）</td></tr><tr><th>新增键</th><td><code>best_prediction</code>、<code>best_prediction_source</code>（"primary"/"fallback"）</td></tr><tr><th>条件新增</th><td><code>primary_fallback_agreement_wer</code>、<code>primary_fallback_agreement_metric</code>（"wer"/"cer"）——仅双标记分支，阈值判断前写入（C/D 都有）</td></tr><tr><th>条件改写</th><td><code>_skipme</code>：救回分支清空；<strong>默认分支不动</strong></td></tr></table><div class="sample-label">输入 = Stage 6 输出（通过路径完整行原样流入）。走决策树 ⑦ 默认分支：</div>
+<pre><code>{
+  &quot;audio_filepath&quot;: &quot;/data/indic_asr/audio/yt1001_seg000000.opus&quot;,
+  &quot;original_file&quot;: &quot;/data/recordings/yt1001.m4a&quot;,
+  &quot;audio_item_id&quot;: &quot;yt1001_seg000000&quot;,
+  &quot;start_ms&quot;: 310,
+  &quot;end_ms&quot;: 8420,
+  &quot;duration&quot;: 8.11,
+  &quot;sample_rate&quot;: 16000,
+  &quot;num_speakers&quot;: 1,
+  &quot;rttm_filepath&quot;: &quot;rttm/yt1001.rttm&quot;,
+  &quot;sed_events&quot;: [{&quot;label&quot;: &quot;Speech&quot;, &quot;superclass&quot;: &quot;Human sounds&quot;, &quot;start_time&quot;: 0.12, &quot;end_time&quot;: 7.95}],
+  &quot;source_lang&quot;: &quot;hi&quot;,
+  &quot;additional_notes&quot;: {
+    &amp;quot;SpeechBrainLangID&amp;quot;: &amp;quot;hi (conf=0.99)&amp;quot;,
+    &amp;quot;language_decision&amp;quot;: &amp;quot;all-3-agree&amp;quot;,
+    &amp;quot;primary_model&amp;quot;: &amp;quot;indic_canary&amp;quot;,
+    &amp;quot;recovery_model&amp;quot;: &amp;quot;parakeet_riva&amp;quot;,
+    &amp;quot;WhisperHallucination_primary&amp;quot;: &amp;quot;passed&amp;quot;,
+    &amp;quot;WhisperHallucination_asr&amp;quot;: &amp;quot;passed&amp;quot;
+  },
+  &quot;_skipme&quot;: &quot;&quot;,
+  &quot;vad_empty&quot;: false,
+  &quot;reference_text&quot;: &quot;आज बाज़ार में बहुत भीड़ थी, मैं जल्दी घर लौट आया&quot;,
+  &quot;granary_v1_prediction&quot;: &quot;आज बाज़ार में बहुत भीड़ थी, मैं जल्दी घर लौट आया&quot;,
+  &quot;sampling_rate&quot;: 16000,
+  &quot;primary_model_prediction&quot;: &quot;आज बाजार में बहुत भीड थी मैं जल्दी घर लौट आया&quot;,
+  &quot;asr_language&quot;: &quot;hi&quot;,
+  &quot;fallback_model_prediction&quot;: &quot;आज बाजार में बहुत भीड़ थी मैं जल्दी घर लौट आया।&quot;
+}</code></pre><div class="sample-label">输出（完整行，路径 A 默认选主）：</div>
+<pre><code>{
+  &quot;audio_filepath&quot;: &quot;/data/indic_asr/audio/yt1001_seg000000.opus&quot;,
+  &quot;original_file&quot;: &quot;/data/recordings/yt1001.m4a&quot;,
+  &quot;audio_item_id&quot;: &quot;yt1001_seg000000&quot;,
+  &quot;start_ms&quot;: 310,
+  &quot;end_ms&quot;: 8420,
+  &quot;duration&quot;: 8.11,
+  &quot;sample_rate&quot;: 16000,
+  &quot;num_speakers&quot;: 1,
+  &quot;rttm_filepath&quot;: &quot;rttm/yt1001.rttm&quot;,
+  &quot;sed_events&quot;: [{&quot;label&quot;: &quot;Speech&quot;, &quot;superclass&quot;: &quot;Human sounds&quot;, &quot;start_time&quot;: 0.12, &quot;end_time&quot;: 7.95}],
+  &quot;source_lang&quot;: &quot;hi&quot;,
+  &quot;additional_notes&quot;: {
+    &amp;quot;SpeechBrainLangID&amp;quot;: &amp;quot;hi (conf=0.99)&amp;quot;,
+    &amp;quot;language_decision&amp;quot;: &amp;quot;all-3-agree&amp;quot;,
+    &amp;quot;primary_model&amp;quot;: &amp;quot;indic_canary&amp;quot;,
+    &amp;quot;recovery_model&amp;quot;: &amp;quot;parakeet_riva&amp;quot;,
+    &amp;quot;WhisperHallucination_primary&amp;quot;: &amp;quot;passed&amp;quot;,
+    &amp;quot;WhisperHallucination_asr&amp;quot;: &amp;quot;passed&amp;quot;,
+&lt;span class=&quot;delta&quot;&gt;    &amp;quot;SelectBestPrediction&amp;quot;: &amp;quot;used primary&amp;quot;&lt;/span&gt;
+  },
+  &quot;_skipme&quot;: &quot;&quot;,
+  &quot;vad_empty&quot;: false,
+  &quot;reference_text&quot;: &quot;आज बाज़ार में बहुत भीड़ थी, मैं जल्दी घर लौट आया&quot;,
+  &quot;granary_v1_prediction&quot;: &quot;आज बाज़ार में बहुत भीड़ थी, मैं जल्दी घर लौट आया&quot;,
+  &quot;sampling_rate&quot;: 16000,
+  &quot;primary_model_prediction&quot;: &quot;आज बाजार में बहुत भीड थी मैं जल्दी घर लौट आया&quot;,
+  &quot;asr_language&quot;: &quot;hi&quot;,
+  &quot;fallback_model_prediction&quot;: &quot;आज बाजार में बहुत भीड़ थी मैं जल्दी घर लौट आया।&quot;,
+<span class="delta">  &quot;best_prediction&quot;: &quot;आज बाजार में बहुत भीड थी मैं जल्दी घर लौट आया&quot;,</span>   <span class="keep">← = P</span>
+<span class="delta">  &quot;best_prediction_source&quot;: &quot;primary&quot;</span>   <span class="keep">← 选择来源标签</span>
+}</code></pre><div class="variant-label">变体快照（路径 D 双标记不一致——归一化 WER=87.5% &gt; 20%，落默认分支，完整行）：</div>
+<pre><code>{
+  &quot;audio_filepath&quot;: &quot;/data/indic_asr/audio/yt1001_seg000000.opus&quot;,
+  &quot;original_file&quot;: &quot;/data/recordings/yt1001.m4a&quot;,
+  &quot;audio_item_id&quot;: &quot;yt1001_seg000000&quot;,
+  &quot;start_ms&quot;: 310,
+  &quot;end_ms&quot;: 8420,
+  &quot;duration&quot;: 8.11,
+  &quot;sample_rate&quot;: 16000,
+  &quot;num_speakers&quot;: 1,
+  &quot;rttm_filepath&quot;: &quot;rttm/yt1001.rttm&quot;,
+  &quot;sed_events&quot;: [{&quot;label&quot;: &quot;Speech&quot;, &quot;superclass&quot;: &quot;Human sounds&quot;, &quot;start_time&quot;: 0.12, &quot;end_time&quot;: 7.95}],
+  &quot;source_lang&quot;: &quot;hi&quot;,
+  &quot;additional_notes&quot;: {
+    &amp;quot;SpeechBrainLangID&amp;quot;: &amp;quot;hi (conf=0.99)&amp;quot;,
+    &amp;quot;language_decision&amp;quot;: &amp;quot;all-3-agree&amp;quot;,
+    &amp;quot;primary_model&amp;quot;: &amp;quot;indic_canary&amp;quot;,
+    &amp;quot;recovery_model&amp;quot;: &amp;quot;parakeet_riva&amp;quot;,
+    &amp;quot;WhisperHallucination_primary&amp;quot;: &amp;quot;hallucination (repeated_ngrams)&amp;quot;,
+    &amp;quot;WhisperHallucination_asr&amp;quot;: &amp;quot;hallucination (high_char_rate)&amp;quot;,
+&lt;span class=&quot;delta&quot;&gt;    &amp;quot;SelectBestPrediction&amp;quot;: &amp;quot;used primary&amp;quot;&lt;/span&gt;
+  },
+<span class="delta">  &quot;_skipme&quot;: &quot;Hallucination:WhisperHallucination_asr&quot;,</span>   <span class="keep">← 默认分支不动标记 → 行出局待审计</span>
+  &quot;vad_empty&quot;: false,
+  &quot;reference_text&quot;: &quot;आज बाज़ार में बहुत भीड़ थी, मैं जल्दी घर लौट आया&quot;,
+  &quot;granary_v1_prediction&quot;: &quot;आज बाज़ार में बहुत भीड़ थी, मैं जल्दी घर लौट आया&quot;,
+  &quot;sampling_rate&quot;: 16000,
+  &quot;primary_model_prediction&quot;: &quot;आज बाजार आज बाजार आज बाजार आज बाजार&quot;,
+  &quot;asr_language&quot;: &quot;hi&quot;,
+  &quot;fallback_model_prediction&quot;: &quot;बिल्कुल अलग शब्द जो मेल नहीं खाते&quot;,
+<span class="delta">  &quot;best_prediction&quot;: &quot;आज बाजार आज बाजार आज बाजार आज बाजार&quot;,</span>   <span class="keep">← 形式上写 P</span>
+<span class="delta">  &quot;best_prediction_source&quot;: &quot;primary&quot;,</span>
+<span class="delta">  &quot;primary_fallback_agreement_wer&quot;: 87.5,</span>   <span class="keep">← 一致性审计（阈值判断前写入）</span>
+<span class="delta">  &quot;primary_fallback_agreement_metric&quot;: &quot;wer&quot;</span>
+}</code></pre><p>决策树（教程实际生效 ④⑥⑦）：④ 注记含 "recovered" → 选 F；⑥ 双标记 → 归一化（去标点+小写）WER ≤20% → 保 P 清标记（cross_model_agreement）；⑦ 默认 → 选 P 不动标记。</p></div>
+<div class="stageblock">
+<h3>Stage 8：RegexSubstitutionStage（正则清洗） <span class="tag gray">纯 CPU · 确定性</span></h3>
+<table class="keys"><tr><th>读取键</th><td><code>best_prediction</code>（变换对象）、<code>_skipme</code>（门禁：非空则绕过）</td></tr><tr><th>新增键</th><td><code>cleaned_text</code>（被标行置<strong>空串</strong>，非原文拷贝）</td></tr><tr><th>条件写入</th><td><code>_skipme = "Empty after regex cleaning"</code>（有内容→清洗后全空时）</td></tr><tr><th>不写</th><td><code>additional_notes</code>（纯文本变换，零注记）</td></tr></table><div class="sample-label">输入 = Stage 7 输出（路径 A 完整行原样流入）。本例全为合法天城文 → 仅空白折叠生效：</div>
+<pre><code>{
+  &quot;audio_filepath&quot;: &quot;/data/indic_asr/audio/yt1001_seg000000.opus&quot;,
+  &quot;original_file&quot;: &quot;/data/recordings/yt1001.m4a&quot;,
+  &quot;audio_item_id&quot;: &quot;yt1001_seg000000&quot;,
+  &quot;start_ms&quot;: 310,
+  &quot;end_ms&quot;: 8420,
+  &quot;duration&quot;: 8.11,
+  &quot;sample_rate&quot;: 16000,
+  &quot;num_speakers&quot;: 1,
+  &quot;rttm_filepath&quot;: &quot;rttm/yt1001.rttm&quot;,
+  &quot;sed_events&quot;: [{&quot;label&quot;: &quot;Speech&quot;, &quot;superclass&quot;: &quot;Human sounds&quot;, &quot;start_time&quot;: 0.12, &quot;end_time&quot;: 7.95}],
+  &quot;source_lang&quot;: &quot;hi&quot;,
+  &quot;additional_notes&quot;: {
+    &amp;quot;SpeechBrainLangID&amp;quot;: &amp;quot;hi (conf=0.99)&amp;quot;,
+    &amp;quot;language_decision&amp;quot;: &amp;quot;all-3-agree&amp;quot;,
+    &amp;quot;primary_model&amp;quot;: &amp;quot;indic_canary&amp;quot;,
+    &amp;quot;recovery_model&amp;quot;: &amp;quot;parakeet_riva&amp;quot;,
+    &amp;quot;WhisperHallucination_primary&amp;quot;: &amp;quot;passed&amp;quot;,
+    &amp;quot;WhisperHallucination_asr&amp;quot;: &amp;quot;passed&amp;quot;,
+    &amp;quot;SelectBestPrediction&amp;quot;: &amp;quot;used primary&amp;quot;
+  },
+  &quot;_skipme&quot;: &quot;&quot;,
+  &quot;vad_empty&quot;: false,
+  &quot;reference_text&quot;: &quot;आज बाज़ार में बहुत भीड़ थी, मैं जल्दी घर लौट आया&quot;,
+  &quot;granary_v1_prediction&quot;: &quot;आज बाज़ार में बहुत भीड़ थी, मैं जल्दी घर लौट आया&quot;,
+  &quot;sampling_rate&quot;: 16000,
+  &quot;primary_model_prediction&quot;: &quot;आज बाजार में बहुत भीड थी मैं जल्दी घर लौट आया&quot;,
+  &quot;asr_language&quot;: &quot;hi&quot;,
+  &quot;fallback_model_prediction&quot;: &quot;आज बाजार में बहुत भीड़ थी मैं जल्दी घर लौट आया।&quot;,
+  &quot;best_prediction&quot;: &quot;आज बाजार में बहुत भीड थी मैं जल्दी घर लौट आया&quot;,
+  &quot;best_prediction_source&quot;: &quot;primary&quot;
+}</code></pre><div class="sample-label">输出（完整行）：</div>
+<pre><code>{
+  &quot;audio_filepath&quot;: &quot;/data/indic_asr/audio/yt1001_seg000000.opus&quot;,
+  &quot;original_file&quot;: &quot;/data/recordings/yt1001.m4a&quot;,
+  &quot;audio_item_id&quot;: &quot;yt1001_seg000000&quot;,
+  &quot;start_ms&quot;: 310,
+  &quot;end_ms&quot;: 8420,
+  &quot;duration&quot;: 8.11,
+  &quot;sample_rate&quot;: 16000,
+  &quot;num_speakers&quot;: 1,
+  &quot;rttm_filepath&quot;: &quot;rttm/yt1001.rttm&quot;,
+  &quot;sed_events&quot;: [{&quot;label&quot;: &quot;Speech&quot;, &quot;superclass&quot;: &quot;Human sounds&quot;, &quot;start_time&quot;: 0.12, &quot;end_time&quot;: 7.95}],
+  &quot;source_lang&quot;: &quot;hi&quot;,
+  &quot;additional_notes&quot;: {
+    &amp;quot;SpeechBrainLangID&amp;quot;: &amp;quot;hi (conf=0.99)&amp;quot;,
+    &amp;quot;language_decision&amp;quot;: &amp;quot;all-3-agree&amp;quot;,
+    &amp;quot;primary_model&amp;quot;: &amp;quot;indic_canary&amp;quot;,
+    &amp;quot;recovery_model&amp;quot;: &amp;quot;parakeet_riva&amp;quot;,
+    &amp;quot;WhisperHallucination_primary&amp;quot;: &amp;quot;passed&amp;quot;,
+    &amp;quot;WhisperHallucination_asr&amp;quot;: &amp;quot;passed&amp;quot;,
+    &amp;quot;SelectBestPrediction&amp;quot;: &amp;quot;used primary&amp;quot;
+  },
+  &quot;_skipme&quot;: &quot;&quot;,
+  &quot;vad_empty&quot;: false,
+  &quot;reference_text&quot;: &quot;आज बाज़ार में बहुत भीड़ थी, मैं जल्दी घर लौट आया&quot;,
+  &quot;granary_v1_prediction&quot;: &quot;आज बाज़ार में बहुत भीड़ थी, मैं जल्दी घर लौट आया&quot;,
+  &quot;sampling_rate&quot;: 16000,
+  &quot;primary_model_prediction&quot;: &quot;आज बाजार में बहुत भीड थी मैं जल्दी घर लौट आया&quot;,
+  &quot;asr_language&quot;: &quot;hi&quot;,
+  &quot;fallback_model_prediction&quot;: &quot;आज बाजार में बहुत भीड़ थी मैं जल्दी घर लौट आया।&quot;,
+  &quot;best_prediction&quot;: &quot;आज बाजार में बहुत भीड थी मैं जल्दी घर लौट आया&quot;,
+  &quot;best_prediction_source&quot;: &quot;primary&quot;,
+<span class="delta">  &quot;cleaned_text&quot;: &quot;आज बाजार में बहुत भीड थी मैं जल्दी घर लौट आया&quot;</span>   <span class="keep">← 本行无变化（best_prediction 原文保留可对比）</span>
+}</code></pre><div class="variant-label">规则走查示例（best_prediction = "धन्यवाद। (music) ♫ A P I — 50% off___" 时）：</div><pre><code>cleaned_text = "धन्यवाद. A P I - 50% off"
+<span class="keep">// ।→. 、(music) 半角括号连内容删、♫→空格、—→-、___→空格、空白折叠（A P I 的拼接是 S9 职责）
+中文例: "太好了！！！今天，走了两万步。" → "太好了!今天,走了两万步."</span></code></pre></div>
+<div class="stageblock">
+<h3>Stage 9：AbbreviationConcatStage（缩写拼接） <span class="tag gray">纯 CPU · 正则定位+回调裁决</span></h3>
+<table class="keys"><tr><th>读取键</th><td><code>cleaned_text</code>（变换对象）、<code>source_lang</code>（选语言字符类，hi/zh 回退 [A-Za-z]）、<code>_skipme</code>（门禁）</td></tr><tr><th>新增键</th><td><code>abbreviated_text</code>（<strong>最终文本</strong>；被标行置空串）</td></tr><tr><th>条件写入</th><td><code>AbbreviationConcat = "applied (A P I -&gt; API, …)"</code>（仅真实拼接时；无变化不写）</td></tr><tr><th>不写</th><td><code>_skipme</code>（拼接失败=原样通过，无失败语义）</td></tr></table><div class="sample-label">输入 = Stage 8 输出（上方完整行原样流入）。天城文文本无拉丁字母串 → 无命中：</div>
+<pre><code>{
+  &quot;audio_filepath&quot;: &quot;/data/indic_asr/audio/yt1001_seg000000.opus&quot;,
+  &quot;original_file&quot;: &quot;/data/recordings/yt1001.m4a&quot;,
+  &quot;audio_item_id&quot;: &quot;yt1001_seg000000&quot;,
+  &quot;start_ms&quot;: 310,
+  &quot;end_ms&quot;: 8420,
+  &quot;duration&quot;: 8.11,
+  &quot;sample_rate&quot;: 16000,
+  &quot;num_speakers&quot;: 1,
+  &quot;rttm_filepath&quot;: &quot;rttm/yt1001.rttm&quot;,
+  &quot;sed_events&quot;: [{&quot;label&quot;: &quot;Speech&quot;, &quot;superclass&quot;: &quot;Human sounds&quot;, &quot;start_time&quot;: 0.12, &quot;end_time&quot;: 7.95}],
+  &quot;source_lang&quot;: &quot;hi&quot;,
+  &quot;additional_notes&quot;: {
+    &amp;quot;SpeechBrainLangID&amp;quot;: &amp;quot;hi (conf=0.99)&amp;quot;,
+    &amp;quot;language_decision&amp;quot;: &amp;quot;all-3-agree&amp;quot;,
+    &amp;quot;primary_model&amp;quot;: &amp;quot;indic_canary&amp;quot;,
+    &amp;quot;recovery_model&amp;quot;: &amp;quot;parakeet_riva&amp;quot;,
+    &amp;quot;WhisperHallucination_primary&amp;quot;: &amp;quot;passed&amp;quot;,
+    &amp;quot;WhisperHallucination_asr&amp;quot;: &amp;quot;passed&amp;quot;,
+    &amp;quot;SelectBestPrediction&amp;quot;: &amp;quot;used primary&amp;quot;
+  },
+  &quot;_skipme&quot;: &quot;&quot;,
+  &quot;vad_empty&quot;: false,
+  &quot;reference_text&quot;: &quot;आज बाज़ार में बहुत भीड़ थी, मैं जल्दी घर लौट आया&quot;,
+  &quot;granary_v1_prediction&quot;: &quot;आज बाज़ार में बहुत भीड़ थी, मैं जल्दी घर लौट आया&quot;,
+  &quot;sampling_rate&quot;: 16000,
+  &quot;primary_model_prediction&quot;: &quot;आज बाजार में बहुत भीड थी मैं जल्दी घर लौट आया&quot;,
+  &quot;asr_language&quot;: &quot;hi&quot;,
+  &quot;fallback_model_prediction&quot;: &quot;आज बाजार में बहुत भीड़ थी मैं जल्दी घर लौट आया।&quot;,
+  &quot;best_prediction&quot;: &quot;आज बाजार में बहुत भीड थी मैं जल्दी घर लौट आया&quot;,
+  &quot;best_prediction_source&quot;: &quot;primary&quot;,
+  &quot;cleaned_text&quot;: &quot;आज बाजार में बहुत भीड थी मैं जल्दी घर लौट आया&quot;
+}</code></pre><div class="sample-label">输出（完整行）：</div>
+<pre><code>{
+  &quot;audio_filepath&quot;: &quot;/data/indic_asr/audio/yt1001_seg000000.opus&quot;,
+  &quot;original_file&quot;: &quot;/data/recordings/yt1001.m4a&quot;,
+  &quot;audio_item_id&quot;: &quot;yt1001_seg000000&quot;,
+  &quot;start_ms&quot;: 310,
+  &quot;end_ms&quot;: 8420,
+  &quot;duration&quot;: 8.11,
+  &quot;sample_rate&quot;: 16000,
+  &quot;num_speakers&quot;: 1,
+  &quot;rttm_filepath&quot;: &quot;rttm/yt1001.rttm&quot;,
+  &quot;sed_events&quot;: [{&quot;label&quot;: &quot;Speech&quot;, &quot;superclass&quot;: &quot;Human sounds&quot;, &quot;start_time&quot;: 0.12, &quot;end_time&quot;: 7.95}],
+  &quot;source_lang&quot;: &quot;hi&quot;,
+  &quot;additional_notes&quot;: {
+    &amp;quot;SpeechBrainLangID&amp;quot;: &amp;quot;hi (conf=0.99)&amp;quot;,
+    &amp;quot;language_decision&amp;quot;: &amp;quot;all-3-agree&amp;quot;,
+    &amp;quot;primary_model&amp;quot;: &amp;quot;indic_canary&amp;quot;,
+    &amp;quot;recovery_model&amp;quot;: &amp;quot;parakeet_riva&amp;quot;,
+    &amp;quot;WhisperHallucination_primary&amp;quot;: &amp;quot;passed&amp;quot;,
+    &amp;quot;WhisperHallucination_asr&amp;quot;: &amp;quot;passed&amp;quot;,
+    &amp;quot;SelectBestPrediction&amp;quot;: &amp;quot;used primary&amp;quot;
+  },
+  &quot;_skipme&quot;: &quot;&quot;,
+  &quot;vad_empty&quot;: false,
+  &quot;reference_text&quot;: &quot;आज बाज़ार में बहुत भीड़ थी, मैं जल्दी घर लौट आया&quot;,
+  &quot;granary_v1_prediction&quot;: &quot;आज बाज़ार में बहुत भीड़ थी, मैं जल्दी घर लौट आया&quot;,
+  &quot;sampling_rate&quot;: 16000,
+  &quot;primary_model_prediction&quot;: &quot;आज बाजार में बहुत भीड थी मैं जल्दी घर लौट आया&quot;,
+  &quot;asr_language&quot;: &quot;hi&quot;,
+  &quot;fallback_model_prediction&quot;: &quot;आज बाजार में बहुत भीड़ थी मैं जल्दी घर लौट आया।&quot;,
+  &quot;best_prediction&quot;: &quot;आज बाजार में बहुत भीड थी मैं जल्दी घर लौट आया&quot;,
+  &quot;best_prediction_source&quot;: &quot;primary&quot;,
+  &quot;cleaned_text&quot;: &quot;आज बाजार में बहुत भीड थी मैं जल्दी घर लौट आया&quot;,
+<span class="delta">  &quot;abbreviated_text&quot;: &quot;आज बाजार में बहुत भीड थी मैं जल्दी घर लौट आया&quot;</span>   <span class="keep">← = cleaned_text（无缩写）</span>
+}</code></pre><div class="variant-label">规则示例（cleaned_text = "मैंने A P I और C D Ns देखा, I I बोला, B B नहीं, A P Is भी" 时）：</div><pre><code>abbreviated_text = "मैंने API और CDNs देखा, I I बोला, B B नहीं, APIs भी"
+注记新增: "AbbreviationConcat": "applied (A P I -&gt; API, C D Ns -&gt; CDN, A P I s -&gt; APIs)"
+<span class="keep">// A P I→API ✓ / C D Ns→CDNs(辅音复数尾) / I I 不动(代词) / B B 不动(全同字母) / A P Is→APIs(特例)</span></code></pre><p class="keep">// 无拼接 → 上方完整行不写 AbbreviationConcat 注记。</p></div>
+<div class="stageblock">
+<h3>Stage 10：GetPairwiseWerStage（对参考算 WER） <span class="tag gray">纯 CPU · 度量</span></h3>
+<table class="keys"><tr><th>读取键</th><td><code>reference_text</code>（参考 R）、<code>abbreviated_text</code>（假设）</td></tr><tr><th>新增键</th><td><code>wer_pct</code>（百分数 4 位小数；可 &gt;100%）</td></tr><tr><th>不写</th><td><code>_skipme</code>、<code>additional_notes</code>（纯度量；教程内无下游消费者）</td></tr></table><div class="sample-label">输入 = Stage 9 输出（上方完整行原样流入）。裸比较（大小写敏感、标点挂词上）：</div>
+<pre><code>{
+  &quot;audio_filepath&quot;: &quot;/data/indic_asr/audio/yt1001_seg000000.opus&quot;,
+  &quot;original_file&quot;: &quot;/data/recordings/yt1001.m4a&quot;,
+  &quot;audio_item_id&quot;: &quot;yt1001_seg000000&quot;,
+  &quot;start_ms&quot;: 310,
+  &quot;end_ms&quot;: 8420,
+  &quot;duration&quot;: 8.11,
+  &quot;sample_rate&quot;: 16000,
+  &quot;num_speakers&quot;: 1,
+  &quot;rttm_filepath&quot;: &quot;rttm/yt1001.rttm&quot;,
+  &quot;sed_events&quot;: [{&quot;label&quot;: &quot;Speech&quot;, &quot;superclass&quot;: &quot;Human sounds&quot;, &quot;start_time&quot;: 0.12, &quot;end_time&quot;: 7.95}],
+  &quot;source_lang&quot;: &quot;hi&quot;,
+  &quot;additional_notes&quot;: {
+    &amp;quot;SpeechBrainLangID&amp;quot;: &amp;quot;hi (conf=0.99)&amp;quot;,
+    &amp;quot;language_decision&amp;quot;: &amp;quot;all-3-agree&amp;quot;,
+    &amp;quot;primary_model&amp;quot;: &amp;quot;indic_canary&amp;quot;,
+    &amp;quot;recovery_model&amp;quot;: &amp;quot;parakeet_riva&amp;quot;,
+    &amp;quot;WhisperHallucination_primary&amp;quot;: &amp;quot;passed&amp;quot;,
+    &amp;quot;WhisperHallucination_asr&amp;quot;: &amp;quot;passed&amp;quot;,
+    &amp;quot;SelectBestPrediction&amp;quot;: &amp;quot;used primary&amp;quot;
+  },
+  &quot;_skipme&quot;: &quot;&quot;,
+  &quot;vad_empty&quot;: false,
+  &quot;reference_text&quot;: &quot;आज बाज़ार में बहुत भीड़ थी, मैं जल्दी घर लौट आया&quot;,
+  &quot;granary_v1_prediction&quot;: &quot;आज बाज़ार में बहुत भीड़ थी, मैं जल्दी घर लौट आया&quot;,
+  &quot;sampling_rate&quot;: 16000,
+  &quot;primary_model_prediction&quot;: &quot;आज बाजार में बहुत भीड थी मैं जल्दी घर लौट आया&quot;,
+  &quot;asr_language&quot;: &quot;hi&quot;,
+  &quot;fallback_model_prediction&quot;: &quot;आज बाजार में बहुत भीड़ थी मैं जल्दी घर लौट आया।&quot;,
+  &quot;best_prediction&quot;: &quot;आज बाजार में बहुत भीड थी मैं जल्दी घर लौट आया&quot;,
+  &quot;best_prediction_source&quot;: &quot;primary&quot;,
+  &quot;cleaned_text&quot;: &quot;आज बाजार में बहुत भीड थी मैं जल्दी घर लौट आया&quot;,
+  &quot;abbreviated_text&quot;: &quot;आज बाजार में बहुत भीड थी मैं जल्दी घर लौट आया&quot;
+}</code></pre><div class="sample-label">输出（完整行）：</div>
+<pre><code>{
+  &quot;audio_filepath&quot;: &quot;/data/indic_asr/audio/yt1001_seg000000.opus&quot;,
+  &quot;original_file&quot;: &quot;/data/recordings/yt1001.m4a&quot;,
+  &quot;audio_item_id&quot;: &quot;yt1001_seg000000&quot;,
+  &quot;start_ms&quot;: 310,
+  &quot;end_ms&quot;: 8420,
+  &quot;duration&quot;: 8.11,
+  &quot;sample_rate&quot;: 16000,
+  &quot;num_speakers&quot;: 1,
+  &quot;rttm_filepath&quot;: &quot;rttm/yt1001.rttm&quot;,
+  &quot;sed_events&quot;: [{&quot;label&quot;: &quot;Speech&quot;, &quot;superclass&quot;: &quot;Human sounds&quot;, &quot;start_time&quot;: 0.12, &quot;end_time&quot;: 7.95}],
+  &quot;source_lang&quot;: &quot;hi&quot;,
+  &quot;additional_notes&quot;: {
+    &amp;quot;SpeechBrainLangID&amp;quot;: &amp;quot;hi (conf=0.99)&amp;quot;,
+    &amp;quot;language_decision&amp;quot;: &amp;quot;all-3-agree&amp;quot;,
+    &amp;quot;primary_model&amp;quot;: &amp;quot;indic_canary&amp;quot;,
+    &amp;quot;recovery_model&amp;quot;: &amp;quot;parakeet_riva&amp;quot;,
+    &amp;quot;WhisperHallucination_primary&amp;quot;: &amp;quot;passed&amp;quot;,
+    &amp;quot;WhisperHallucination_asr&amp;quot;: &amp;quot;passed&amp;quot;,
+    &amp;quot;SelectBestPrediction&amp;quot;: &amp;quot;used primary&amp;quot;
+  },
+  &quot;_skipme&quot;: &quot;&quot;,
+  &quot;vad_empty&quot;: false,
+  &quot;reference_text&quot;: &quot;आज बाज़ार में बहुत भीड़ थी, मैं जल्दी घर लौट आया&quot;,
+  &quot;granary_v1_prediction&quot;: &quot;आज बाज़ार में बहुत भीड़ थी, मैं जल्दी घर लौट आया&quot;,
+  &quot;sampling_rate&quot;: 16000,
+  &quot;primary_model_prediction&quot;: &quot;आज बाजार में बहुत भीड थी मैं जल्दी घर लौट आया&quot;,
+  &quot;asr_language&quot;: &quot;hi&quot;,
+  &quot;fallback_model_prediction&quot;: &quot;आज बाजार में बहुत भीड़ थी मैं जल्दी घर लौट आया।&quot;,
+  &quot;best_prediction&quot;: &quot;आज बाजार में बहुत भीड थी मैं जल्दी घर लौट आया&quot;,
+  &quot;best_prediction_source&quot;: &quot;primary&quot;,
+  &quot;cleaned_text&quot;: &quot;आज बाजार में बहुत भीड थी मैं जल्दी घर लौट आया&quot;,
+  &quot;abbreviated_text&quot;: &quot;आज बाजार में बहुत भीड थी मैं जल्दी घर लौट आया&quot;,
+<span class="delta">  &quot;wer_pct&quot;: 27.2727</span>   <span class="keep">← 3 替换 / 11 参考词（बाज़ार≠बाजार、भीड़≠भीड、थी,≠थी）</span>
+}</code></pre><div class="variant-label">对齐过程：</div><pre><code>参考(11词): आज  बाज़ार  में  बहुत  भीड़  थी,  मैं  जल्दी  घर  लौट  आया
+假设(11词): आज  बाजार  में  बहुत  भीड   थी   मैं  जल्दी  घर  लौट  आया
+                 ↑替换1          ↑替换2  ↑替换3(逗号)
+WER = 3/11 × 100 = 27.2727</code></pre><div class="note">与 Stage 7 一致性 WER 的区别：那是<strong>归一化后 P vs F</strong>（去标点小写，路由信号）；本阶段是<strong>裸文本 vs 人工参考</strong>（评估指标）。README 实录：30 参考词 10 替换 → 33.3333。被标行 abbreviated_text=""（非 None）照样计算 → wer_pct≈100（统计须配合 _skipme 过滤）。</div></div>
+<div class="stageblock">
+<h3>Stage 11：ManifestWriterStage（落盘） <span class="tag gray">纯 CPU · 单写者</span></h3>
+<table class="keys"><tr><th>读取键</th><td><code>task.data</code> 整体（序列化对象；有张量会崩——waveform 已在 S5 释放）</td></tr><tr><th>新增键</th><td><strong>无</strong>——纯 sink，data 零变化</td></tr><tr><th>副作用</th><td>写输出 JSONL（UTF-8 原文、逐行追加）+ <code>._RUN</code>/<code>._RESUME</code> 崩溃一致性伴生文件</td></tr></table><div class="sample-label">输入 = Stage 10 输出（上方完整行原样流入）：</div>
+<pre><code>{
+  &quot;audio_filepath&quot;: &quot;/data/indic_asr/audio/yt1001_seg000000.opus&quot;,
+  &quot;original_file&quot;: &quot;/data/recordings/yt1001.m4a&quot;,
+  &quot;audio_item_id&quot;: &quot;yt1001_seg000000&quot;,
+  &quot;start_ms&quot;: 310,
+  &quot;end_ms&quot;: 8420,
+  &quot;duration&quot;: 8.11,
+  &quot;sample_rate&quot;: 16000,
+  &quot;num_speakers&quot;: 1,
+  &quot;rttm_filepath&quot;: &quot;rttm/yt1001.rttm&quot;,
+  &quot;sed_events&quot;: [{&quot;label&quot;: &quot;Speech&quot;, &quot;superclass&quot;: &quot;Human sounds&quot;, &quot;start_time&quot;: 0.12, &quot;end_time&quot;: 7.95}],
+  &quot;source_lang&quot;: &quot;hi&quot;,
+  &quot;additional_notes&quot;: {
+    &amp;quot;SpeechBrainLangID&amp;quot;: &amp;quot;hi (conf=0.99)&amp;quot;,
+    &amp;quot;language_decision&amp;quot;: &amp;quot;all-3-agree&amp;quot;,
+    &amp;quot;primary_model&amp;quot;: &amp;quot;indic_canary&amp;quot;,
+    &amp;quot;recovery_model&amp;quot;: &amp;quot;parakeet_riva&amp;quot;,
+    &amp;quot;WhisperHallucination_primary&amp;quot;: &amp;quot;passed&amp;quot;,
+    &amp;quot;WhisperHallucination_asr&amp;quot;: &amp;quot;passed&amp;quot;,
+    &amp;quot;SelectBestPrediction&amp;quot;: &amp;quot;used primary&amp;quot;
+  },
+  &quot;_skipme&quot;: &quot;&quot;,
+  &quot;vad_empty&quot;: false,
+  &quot;reference_text&quot;: &quot;आज बाज़ार में बहुत भीड़ थी, मैं जल्दी घर लौट आया&quot;,
+  &quot;granary_v1_prediction&quot;: &quot;आज बाज़ार में बहुत भीड़ थी, मैं जल्दी घर लौट आया&quot;,
+  &quot;sampling_rate&quot;: 16000,
+  &quot;primary_model_prediction&quot;: &quot;आज बाजार में बहुत भीड थी मैं जल्दी घर लौट आया&quot;,
+  &quot;asr_language&quot;: &quot;hi&quot;,
+  &quot;fallback_model_prediction&quot;: &quot;आज बाजार में बहुत भीड़ थी मैं जल्दी घर लौट आया।&quot;,
+  &quot;best_prediction&quot;: &quot;आज बाजार में बहुत भीड थी मैं जल्दी घर लौट आया&quot;,
+  &quot;best_prediction_source&quot;: &quot;primary&quot;,
+  &quot;cleaned_text&quot;: &quot;आज बाजार में बहुत भीड थी मैं जल्दी घर लौट आया&quot;,
+  &quot;abbreviated_text&quot;: &quot;आज बाजार में बहुत भीड थी मैं जल्दी घर लौट आया&quot;,
+  &quot;wer_pct&quot;: 27.2727
+}</code></pre><div class="sample-label">输出 = 写入 /outputs/indic_asr_xenna.jsonl 的一行（与输入逐字相同，一行式落盘形态）：</div>
+<pre><code>{&quot;audio_filepath&quot;: &quot;/data/indic_asr/audio/yt1001_seg000000.opus&quot;, &quot;original_file&quot;: &quot;/data/recordings/yt1001.m4a&quot;, &quot;audio_item_id&quot;: &quot;yt1001_seg000000&quot;, &quot;start_ms&quot;: 310, &quot;end_ms&quot;: 8420, &quot;duration&quot;: 8.11, &quot;sample_rate&quot;: 16000, &quot;num_speakers&quot;: 1, &quot;rttm_filepath&quot;: &quot;rttm/yt1001.rttm&quot;, &quot;sed_events&quot;: [{&quot;label&quot;: &quot;Speech&quot;, &quot;superclass&quot;: &quot;Human sounds&quot;, &quot;start_time&quot;: 0.12, &quot;end_time&quot;: 7.95}], &quot;source_lang&quot;: &quot;hi&quot;, &quot;additional_notes&quot;: {&quot;SpeechBrainLangID&quot;: &quot;hi (conf=0.99)&quot;, &quot;language_decision&quot;: &quot;all-3-agree&quot;, &quot;primary_model&quot;: &quot;indic_canary&quot;, &quot;recovery_model&quot;: &quot;parakeet_riva&quot;, &quot;WhisperHallucination_primary&quot;: &quot;passed&quot;, &quot;WhisperHallucination_asr&quot;: &quot;passed&quot;, &quot;SelectBestPrediction&quot;: &quot;used primary&quot;}, &quot;_skipme&quot;: &quot;&quot;, &quot;vad_empty&quot;: false, &quot;reference_text&quot;: &quot;आज बाज़ार में बहुत भीड़ थी, मैं जल्दी घर लौट आया&quot;, &quot;granary_v1_prediction&quot;: &quot;आज बाज़ार में बहुत भीड़ थी, मैं जल्दी घर लौट आया&quot;, &quot;sampling_rate&quot;: 16000, &quot;primary_model_prediction&quot;: &quot;आज बाजार में बहुत भीड थी मैं जल्दी घर लौट आया&quot;, &quot;asr_language&quot;: &quot;hi&quot;, &quot;fallback_model_prediction&quot;: &quot;आज बाजार में बहुत भीड़ थी मैं जल्दी घर लौट आया।&quot;, &quot;best_prediction&quot;: &quot;आज बाजार में बहुत भीड थी मैं जल्दी घर लौट आया&quot;, &quot;best_prediction_source&quot;: &quot;primary&quot;, &quot;cleaned_text&quot;: &quot;आज बाजार में बहुत भीड थी मैं जल्दी घर लौट आया&quot;, &quot;abbreviated_text&quot;: &quot;आज बाजार में बहुत भीड थी मैं जल्दी घर लौट आया&quot;, &quot;wer_pct&quot;: 27.2727}</code></pre><p>返回的 AudioTask 与输入相同（可继续串联下游，如 text_pipeline）。单写者 num_workers=1；<code>._RUN</code> 令牌 / 两段提交+截断恢复 / <code>._RESUME</code> 三方摘要续跑认证 / 失败保留部分输出。</p></div>
+
+  <div class="toc-back"><a href="#toc">↑ 返回目录</a></div>
+</section>
+<section id="s6">
+  <h2>6. indic_asr 关键概念问答</h2>
+  <h3>Q：`_skipme` 是什么？"被标"是什么意思？</h3>
+  <p>行级状态标记位（"skip me"）。空 = 干净；非空 = 该 VAD 段质量未决——<strong>软性未通过，不删除</strong>：行保留落盘、绕过 Stage 8/9 清洗、生产口径排除出需有效转写的阶段。可被救回（路径 B/C 清标记）。</p>
+  <table>
+    <tr><th>取值</th><th>写入者</th><th>含义</th></tr>
+    <tr><td><code>""</code></td><td>Stage 2 / 救回分支</td><td>干净</td></tr>
+    <tr><td><code>Hallucination:WhisperHallucination_primary/_asr</code></td><td>Stage 4 / 6</td><td>幻觉家族标记（值结构 = 类型:写入者实例名）</td></tr>
+    <tr><td><code>lang_not_supported:{stage}</code> / <code>not_supported</code> / <code>audio_load_error</code> / <code>Empty after regex cleaning</code></td><td>Stage 3/5/7/ASR 基类/Stage 8</td><td>其它家族</td></tr>
+  </table>
+  <p><code>additional_notes</code> = 历史账本（只增不删），<code>_skipme</code> = 当前状态（单一真相源）。</p>
+  <h3>Q：选择规则（哪个模型上位）？</h3>
+  <p><strong>默认选 Canary(P)</strong>，仅"对 P 有实证不利"才换人：P 被标 + F 干净（recovered 信号）→ 选 F；双标 + 一致度高（WER≤20%）→ 误报平反保 P；双标 + 不一致 → 形式上写 P 但标记保留（行出局待审计，教程基准 21.6 万行中 37 条）。</p>
+  <h3>Q：唯一词比是什么？</h3>
+  <p><code>len(set(words))/len(words) ≤ 0.4</code> 即标——正常语言接近 1，解码器循环复读骤降；≥60% 重复才标记，给口语合理重复留余量（歌词/口号会误标，故设计为软标记）。</p>
+  <h3>Q：WER/CER 怎么算？</h3>
+  <p>标准 Levenshtein（替换/插入/删除各计 1）：WER 按空白分词、CER 按 Unicode 字符；除以参考词数 ×100。Stage 7 的一致性计算先去标点小写；Stage 10 的评估计算裸比较。</p>
+  <h3>Q：JSONL 输出的目的与粒度？</h3>
+  <p>跨流水线数据契约（metadata→ASR→text_pipeline 靠 manifest 串联）+ 审计账本 + 断点恢复载体 + HF 发布实体（label manifest）。行粒度 = VAD 语音段，永不聚合回父录音。</p>
+  <div class="toc-back"><a href="#toc">↑ 返回目录</a></div></section>
+<section id="s7">
+  <h2>7. text_pipeline：9 个 Stage 逐段精读</h2>
+  <div class="note"><strong>阅读约定</strong>：贯穿示例 = LibriSpeech 段 <code>7800-283478-0020</code>（2.785s 英语朗读）。流水线<strong>不读音频</strong>；输入契约 <code>abbreviated_text</code>（ASR 流水线最终字段，零适配直连）/ <code>text</code>（实体拼写参考，可空）/ <code>source_lang</code>。外置 Dynamo/vLLM 服务（Gemma-4-31B-FP8），stage 全是 CPU+HTTP 客户端；每行 8 次 LLM 请求（5 串行 + 3 并发）。每个 Stage 给出<strong>完整输入行</strong>与<strong>完整输出行</strong>，变体路径以完整行快照展示。</div>
+  <p class="flow">S1 读 → S2 实体恢复 → S3 标点 → S4 语言门禁 → S5 TN(tn_raw) → S6 [字幕‖语码转换‖问答] → S7 ITN → S8 去非流利 → S9 落盘</p>
+<div class="stageblock">
+<h3>Stage 1：ManifestReader <span class="tag gray">纯 CPU</span></h3>
+<table class="keys"><tr><th>读取键</th><td>manifest 文件本身（单读者、零变换、读入时不过滤语言）</td></tr><tr><th>新增键</th><td>无（逐字透传；<code>audio_filepath</code>/<code>duration</code> 纯溯源，全程无人打开音频）</td></tr></table><div class="sample-label">输入（sample_input.jsonl 一行，完整）：</div>
+<pre><code>{
+  &quot;audio_filepath&quot;: &quot;7800-283478-0020.flac&quot;,
+  &quot;audio_item_id&quot;: &quot;7800-283478-0020&quot;,
+  &quot;duration&quot;: 2.785,
+  &quot;text&quot;: &quot;AS THE FOUR CHUMS WENT AWAY JERRY CHUCKLED&quot;,
+  &quot;abbreviated_text&quot;: &quot;As the four chums went away Jerry chuckled&quot;,
+  &quot;source_lang&quot;: &quot;en&quot;
+}</code></pre><div class="sample-label">输出（AudioTask.data，完整——与输入逐字相同）：</div>
+<pre><code>{
+  &quot;audio_filepath&quot;: &quot;7800-283478-0020.flac&quot;,
+  &quot;audio_item_id&quot;: &quot;7800-283478-0020&quot;,
+  &quot;duration&quot;: 2.785,
+  &quot;text&quot;: &quot;AS THE FOUR CHUMS WENT AWAY JERRY CHUCKLED&quot;,
+  &quot;abbreviated_text&quot;: &quot;As the four chums went away Jerry chuckled&quot;,
+  &quot;source_lang&quot;: &quot;en&quot;
+}</code></pre><p class="keep">包装层注记：task_id=""；dataset_name="text_pipeline"；_metadata={"partition_index":0,"total_partitions":1,"source_files":[...]}；_stage_perf=[]。</p></div>
+<div class="stageblock">
+<h3>Stage 2：RecoverEntities（mode=recover_entities） <span class="tag gray">CPU + 远程 LLM</span></h3>
+<table class="keys"><tr><th>读取键</th><td><code>abbreviated_text</code>（NORMALIZED，待修复）、<code>text</code>（INITIAL，拼写权威；<strong>可空</strong>）、<code>_skipme</code>（门禁）</td></tr><tr><th>新增键</th><td><code>entity_recovered_text</code>（整段文本，仅实体词形被替换）；<code>additional_notes</code>（本流水线该字典的创建者）</td></tr><tr><th>跳过路径</th><td>text 空（audio-only 语料常态）→ 不发请求、<strong>原文透传</strong>、<code>skipped (empty)</code>；被标 → 原文透传 + <code>skipped (flagged)</code></td></tr><tr><th>注记词表</th><td><code>recovered / unchanged / fallback (empty output) / skipped (…)</code></td></tr></table><div class="sample-label">输入 = Stage 1 输出（上方完整行原样流入）。LLM 消息 = system(实体规则) + user(INITIAL="text" + NORMALIZED="abbreviated_text")：</div>
+<pre><code>{
+  &quot;audio_filepath&quot;: &quot;7800-283478-0020.flac&quot;,
+  &quot;audio_item_id&quot;: &quot;7800-283478-0020&quot;,
+  &quot;duration&quot;: 2.785,
+  &quot;text&quot;: &quot;AS THE FOUR CHUMS WENT AWAY JERRY CHUCKLED&quot;,
+  &quot;abbreviated_text&quot;: &quot;As the four chums went away Jerry chuckled&quot;,
+  &quot;source_lang&quot;: &quot;en&quot;
+}</code></pre><div class="sample-label">输出（完整行）：</div>
+<pre><code>{
+  &quot;audio_filepath&quot;: &quot;7800-283478-0020.flac&quot;,
+  &quot;audio_item_id&quot;: &quot;7800-283478-0020&quot;,
+  &quot;duration&quot;: 2.785,
+  &quot;text&quot;: &quot;AS THE FOUR CHUMS WENT AWAY JERRY CHUCKLED&quot;,
+  &quot;abbreviated_text&quot;: &quot;As the four chums went away Jerry chuckled&quot;,
+  &quot;source_lang&quot;: &quot;en&quot;,
+<span class="delta">  &quot;entity_recovered_text&quot;: &quot;As the four chums went away JERRY chuckled&quot;,</span>   <span class="keep">← Jerry→JERRY（权威在参考拼写）</span>
+<span class="delta">  &quot;additional_notes&quot;: {
+    &amp;quot;RecoverEntities&amp;quot;: &amp;quot;recovered&amp;quot;
+  }</span>
+}</code></pre><div class="variant-label">变体快照（text 为空——audio-only 语料常态，完整行）：</div>
+<pre><code>{
+  &quot;audio_filepath&quot;: &quot;yt1001_seg000001.opus&quot;,
+  &quot;audio_item_id&quot;: &quot;yt1001_seg000001&quot;,
+  &quot;duration&quot;: 6.375,
+  &quot;text&quot;: &quot;&quot;,
+  &quot;abbreviated_text&quot;: &quot;आज बाजार में बहुत भीड़ थी मैं जल्दी घर लौट आया।&quot;,
+  &quot;source_lang&quot;: &quot;hi&quot;,
+<span class="delta">  &quot;entity_recovered_text&quot;: &quot;आज बाजार में बहुत भीड़ थी मैं जल्दी घर लौट आया।&quot;,</span>   <span class="keep">← 原文透传（不发请求）</span>
+<span class="delta">  &quot;additional_notes&quot;: {
+    &amp;quot;RecoverEntities&amp;quot;: &amp;quot;skipped (empty)&amp;quot;
+  }</span>
+}</code></pre><p>实体规则：只替换纯字母专名（人名/地名/组织/品牌/缩写）；含数字候选排除（"iPhone 15"）；头衔排除（Dr./Prof.）；数字/日期/单位/金额一律不动——输出是<strong>整段文本</strong>而非实体列表。响应剥 &lt;think&gt;/围栏/引号。</p></div>
+<div class="stageblock">
+<h3>Stage 3：PnCRestoration（itn 守卫首启） <span class="tag gray">CPU + 远程 LLM</span></h3>
+<table class="keys"><tr><th>读取键</th><td><code>entity_recovered_text</code>（变换对象；缺失=硬异常）、<code>source_lang</code>（{language} 占位注入原始码 "en"）、<code>_skipme</code>（门禁）</td></tr><tr><th>新增键</th><td><code>pnc_text</code></td></tr><tr><th>守卫（itn）</th><td>词数不得增加 / 无新词（白名单 st·nd·th·dr·kg… 约 50 项 + 罗马数字豁免）/ 过度删除（≥8 词且输出&lt;输入×0.3）；命中 → <strong>回退写输入原文</strong>，注记 <code>fallback (原因)</code>，被拒模型输出不落盘</td></tr><tr><th>注记词表</th><td><code>applied (modified) / applied (unchanged) / fallback (…) / skipped (…)</code></td></tr></table><div class="sample-label">输入 = Stage 2 输出（上方完整行原样流入）。核对：8 词进 8 词出（小写比较 jerry==jerry ✓）→ 通过：</div>
+<pre><code>{
+  &quot;audio_filepath&quot;: &quot;7800-283478-0020.flac&quot;,
+  &quot;audio_item_id&quot;: &quot;7800-283478-0020&quot;,
+  &quot;duration&quot;: 2.785,
+  &quot;text&quot;: &quot;AS THE FOUR CHUMS WENT AWAY JERRY CHUCKLED&quot;,
+  &quot;abbreviated_text&quot;: &quot;As the four chums went away Jerry chuckled&quot;,
+  &quot;source_lang&quot;: &quot;en&quot;,
+  &quot;entity_recovered_text&quot;: &quot;As the four chums went away JERRY chuckled&quot;,
+  &quot;additional_notes&quot;: {
+    &amp;quot;RecoverEntities&amp;quot;: &amp;quot;recovered&amp;quot;
+  }
+}</code></pre><div class="sample-label">输出（完整行）：</div>
+<pre><code>{
+  &quot;audio_filepath&quot;: &quot;7800-283478-0020.flac&quot;,
+  &quot;audio_item_id&quot;: &quot;7800-283478-0020&quot;,
+  &quot;duration&quot;: 2.785,
+  &quot;text&quot;: &quot;AS THE FOUR CHUMS WENT AWAY JERRY CHUCKLED&quot;,
+  &quot;abbreviated_text&quot;: &quot;As the four chums went away Jerry chuckled&quot;,
+  &quot;source_lang&quot;: &quot;en&quot;,
+  &quot;entity_recovered_text&quot;: &quot;As the four chums went away JERRY chuckled&quot;,
+  &quot;additional_notes&quot;: {
+    &amp;quot;RecoverEntities&amp;quot;: &amp;quot;recovered&amp;quot;,
+&lt;span class=&quot;delta&quot;&gt;    &amp;quot;PnCRestoration&amp;quot;: &amp;quot;applied (modified)&amp;quot;&lt;/span&gt;
+  },
+<span class="delta">  &quot;pnc_text&quot;: &quot;As the four chums went away, Jerry chuckled.&quot;</span>   <span class="keep">← 加逗号句号；JERRY→Jerry（小写比较合法通过）</span>
+}</code></pre><div class="variant-label">守卫命中示例（模型输出 "…Jerry chuckled happily." 9 词 &gt; 8 词）：</div><pre><code>pnc_text = <span class="delta">"As the four chums went away JERRY chuckled"</span>   <span class="keep">← 回退为输入原文(entity_recovered_text)</span>
+注记: "PnCRestoration": "fallback (word_count_increase (8-&gt;9))"   <span class="keep">← 17 词输出本身不落盘</span></code></pre></div>
+<div class="stageblock">
+<h3>Stage 4：LanguageID（mode=language_id，守门人） <span class="tag gray">CPU + 远程 LLM</span></h3>
+<table class="keys"><tr><th>读取键</th><td><code>pnc_text</code>（识别对象）、<code>source_lang</code>（验证基准 = expected）、<code>_skipme</code>（门禁）</td></tr><tr><th>新增键</th><td><code>llm_language_prediction</code>（LLM 原始两行输出，逐字保存）</td></tr><tr><th>必写注记</th><td><code>LanguageID: "applied (modified)"</code> + <code>LLMLanguageVerification</code> ∈ {passed (X-x) / kept code-switch (…) / wrong language (…) / unparseable prediction (…) / skipped (…)}</td></tr><tr><th>条件写入</th><td><code>_skipme = "Wrong language:LLMLanguageVerification"</code> 或 <code>"Unparseable language:…"</code>（text_pipeline 的 _skipme 首次诞生地；此前缺席即清白）</td></tr></table><div class="sample-label">输入 = Stage 3 输出（上方完整行原样流入）。LLM 输出两行都是读 pnc_text 的预测（与 metadata 无关；声学预测 = source_lang 字段 = expected）：</div>
+<pre><code>{
+  &quot;audio_filepath&quot;: &quot;7800-283478-0020.flac&quot;,
+  &quot;audio_item_id&quot;: &quot;7800-283478-0020&quot;,
+  &quot;duration&quot;: 2.785,
+  &quot;text&quot;: &quot;AS THE FOUR CHUMS WENT AWAY JERRY CHUCKLED&quot;,
+  &quot;abbreviated_text&quot;: &quot;As the four chums went away Jerry chuckled&quot;,
+  &quot;source_lang&quot;: &quot;en&quot;,
+  &quot;entity_recovered_text&quot;: &quot;As the four chums went away JERRY chuckled&quot;,
+  &quot;additional_notes&quot;: {
+    &amp;quot;RecoverEntities&amp;quot;: &amp;quot;recovered&amp;quot;,
+    &amp;quot;PnCRestoration&amp;quot;: &amp;quot;applied (modified)&amp;quot;
+  },
+  &quot;pnc_text&quot;: &quot;As the four chums went away, Jerry chuckled.&quot;
+}</code></pre><div class="sample-label">输出（完整行，匹配路径）：</div>
+<pre><code>{
+  &quot;audio_filepath&quot;: &quot;7800-283478-0020.flac&quot;,
+  &quot;audio_item_id&quot;: &quot;7800-283478-0020&quot;,
+  &quot;duration&quot;: 2.785,
+  &quot;text&quot;: &quot;AS THE FOUR CHUMS WENT AWAY JERRY CHUCKLED&quot;,
+  &quot;abbreviated_text&quot;: &quot;As the four chums went away Jerry chuckled&quot;,
+  &quot;source_lang&quot;: &quot;en&quot;,
+  &quot;entity_recovered_text&quot;: &quot;As the four chums went away JERRY chuckled&quot;,
+  &quot;additional_notes&quot;: {
+    &amp;quot;RecoverEntities&amp;quot;: &amp;quot;recovered&amp;quot;,
+    &amp;quot;PnCRestoration&amp;quot;: &amp;quot;applied (modified)&amp;quot;,
+&lt;span class=&quot;delta&quot;&gt;    &amp;quot;LanguageID&amp;quot;: &amp;quot;applied (modified)&amp;quot;,&lt;/span&gt;
+&lt;span class=&quot;delta&quot;&gt;    &amp;quot;LLMLanguageVerification&amp;quot;: &amp;quot;passed (English-en)&amp;quot;&lt;/span&gt;
+  },
+  &quot;pnc_text&quot;: &quot;As the four chums went away, Jerry chuckled.&quot;,
+<span class="delta">  &quot;llm_language_prediction&quot;: &quot;Primary: English\nLanguages: English&quot;</span>   <span class="keep">← LLM 原始两行输出，逐字保存</span>
+}</code></pre><div class="variant-label">变体快照（单语言不符——source_lang=hi 但转写是英语，完整行）：</div>
+<pre><code>{
+  &quot;audio_filepath&quot;: &quot;yt1001_seg000003.opus&quot;,
+  &quot;audio_item_id&quot;: &quot;yt1001_seg000003&quot;,
+  &quot;duration&quot;: 5.2,
+  &quot;text&quot;: &quot;&quot;,
+  &quot;abbreviated_text&quot;: &quot;the weather is nice today let us go outside&quot;,
+  &quot;source_lang&quot;: &quot;hi&quot;,
+  &quot;entity_recovered_text&quot;: &quot;the weather is nice today let us go outside&quot;,
+  &quot;pnc_text&quot;: &quot;The weather is nice today. Let us go outside.&quot;,
+<span class="delta">  &quot;llm_language_prediction&quot;: &quot;Primary: English\nLanguages: English&quot;,</span>
+  &quot;additional_notes&quot;: {
+    &amp;quot;RecoverEntities&amp;quot;: &amp;quot;skipped (empty)&amp;quot;,
+    &amp;quot;PnCRestoration&amp;quot;: &amp;quot;applied (modified)&amp;quot;,
+&lt;span class=&quot;delta&quot;&gt;    &amp;quot;LanguageID&amp;quot;: &amp;quot;applied (modified)&amp;quot;,&lt;/span&gt;
+&lt;span class=&quot;delta&quot;&gt;    &amp;quot;LLMLanguageVerification&amp;quot;: &amp;quot;wrong language (predicted=English-en, expected=Hindi-hi)&amp;quot;&lt;/span&gt;
+  },
+<span class="delta">  &quot;_skipme&quot;: &quot;Wrong language:LLMLanguageVerification&quot;</span>   <span class="keep">← Stage 5–8 全部停发请求，行保留</span>
+}</code></pre><p>裁决树（多语言优先）：&gt;1 语言 → 放行 <code>kept code-switch</code>（primary≠expected 也放，source present/absent）；单语言不可解析 → Unparseable 标记；单语言≠expected → Wrong language 标记；匹配 → passed。语码转换例：<code>"मुझे…इस project को कल तक finish…"</code> + source_lang=hi → 预测 "Primary: Hindi\nLanguages: Hindi, English" → 放行（source present）。</p></div>
+<div class="stageblock">
+<h3>Stage 5：TextNormalization → tn_raw（共同源） <span class="tag gray">CPU + 远程 LLM · 守卫关闭</span></h3>
+<table class="keys"><tr><th>读取键</th><td><code>pnc_text</code>（变换对象）、<code>source_lang</code>（{language} 占位）、<code>_skipme</code>（门禁）</td></tr><tr><th>新增键</th><td><code>tn_raw</code>（忠实口语转写——后续 5 个目标的共同输入）</td></tr><tr><th>守卫</th><td><strong>无</strong>（validation_mode:none——数字展开合法膨胀词数，itn 守卫会误杀；代价：空/垃圾输出无兜底直接落盘）</td></tr><tr><th>硬约束</th><td>保留 fillers/重复/错误起始/口语形式(gonna)；习语专名不动(One Direction)；16 类转换表</td></tr></table><div class="sample-label">输入 = Stage 4 输出（匹配路径完整行原样流入）。本句无数字可转：</div>
+<pre><code>{
+  &quot;audio_filepath&quot;: &quot;7800-283478-0020.flac&quot;,
+  &quot;audio_item_id&quot;: &quot;7800-283478-0020&quot;,
+  &quot;duration&quot;: 2.785,
+  &quot;text&quot;: &quot;AS THE FOUR CHUMS WENT AWAY JERRY CHUCKLED&quot;,
+  &quot;abbreviated_text&quot;: &quot;As the four chums went away Jerry chuckled&quot;,
+  &quot;source_lang&quot;: &quot;en&quot;,
+  &quot;entity_recovered_text&quot;: &quot;As the four chums went away JERRY chuckled&quot;,
+  &quot;additional_notes&quot;: {
+    &amp;quot;RecoverEntities&amp;quot;: &amp;quot;recovered&amp;quot;,
+    &amp;quot;PnCRestoration&amp;quot;: &amp;quot;applied (modified)&amp;quot;,
+    &amp;quot;LanguageID&amp;quot;: &amp;quot;applied (modified)&amp;quot;,
+    &amp;quot;LLMLanguageVerification&amp;quot;: &amp;quot;passed (English-en)&amp;quot;
+  },
+  &quot;pnc_text&quot;: &quot;As the four chums went away, Jerry chuckled.&quot;,
+  &quot;llm_language_prediction&quot;: &quot;Primary: English\nLanguages: English&quot;
+}</code></pre><div class="sample-label">输出（完整行）：</div>
+<pre><code>{
+  &quot;audio_filepath&quot;: &quot;7800-283478-0020.flac&quot;,
+  &quot;audio_item_id&quot;: &quot;7800-283478-0020&quot;,
+  &quot;duration&quot;: 2.785,
+  &quot;text&quot;: &quot;AS THE FOUR CHUMS WENT AWAY JERRY CHUCKLED&quot;,
+  &quot;abbreviated_text&quot;: &quot;As the four chums went away Jerry chuckled&quot;,
+  &quot;source_lang&quot;: &quot;en&quot;,
+  &quot;entity_recovered_text&quot;: &quot;As the four chums went away JERRY chuckled&quot;,
+  &quot;additional_notes&quot;: {
+    &amp;quot;RecoverEntities&amp;quot;: &amp;quot;recovered&amp;quot;,
+    &amp;quot;PnCRestoration&amp;quot;: &amp;quot;applied (modified)&amp;quot;,
+    &amp;quot;LanguageID&amp;quot;: &amp;quot;applied (modified)&amp;quot;,
+    &amp;quot;LLMLanguageVerification&amp;quot;: &amp;quot;passed (English-en)&amp;quot;,
+&lt;span class=&quot;delta&quot;&gt;    &amp;quot;TextNormalization&amp;quot;: &amp;quot;applied (unchanged)&amp;quot;&lt;/span&gt;
+  },
+  &quot;pnc_text&quot;: &quot;As the four chums went away, Jerry chuckled.&quot;,
+  &quot;llm_language_prediction&quot;: &quot;Primary: English\nLanguages: English&quot;,
+<span class="delta">  &quot;tn_raw&quot;: &quot;As the four chums went away, Jerry chuckled.&quot;</span>   <span class="keep">← 与 pnc_text 逐字相同（无数字）</span>
+}</code></pre><div class="variant-label">转换示例（pnc_text 含数字时 tn_raw 的值）：</div><pre><code>pnc_text: "I bought 3 apples for $12.50, uh, on January 22nd."
+tn_raw:   "I bought three apples for twelve dollars and fifty cents, uh, on january twenty second."
+<span class="keep">← 3→three, $12.50 展开, 日期口语化; "uh" 填充词保留</span></code></pre></div>
+<div class="stageblock">
+<h3>Stage 6：FusedTextLLM（三操作并发） <span class="tag gray">CPU + 远程 LLM ×3 并发</span></h3>
+<table class="keys"><tr><th>读取键</th><td><code>tn_raw</code>（×3 请求体，共同输入）、<code>source_lang</code>（②语码转换的语言占位）、<code>_skipme</code>（门禁，一行标三操作全跳）</td></tr><tr><th>新增键</th><td><code>captioning_text</code>、<code>code_switched_text</code>、<code>speech_qa_text</code></td></tr><tr><th>配置期校验</th><td>子操作名唯一/输出键唯一/输出不得互为输入（独立性强保证）；三请求合并进同一次 gather（≤3×batch 并发）</td></tr><tr><th>输出不回灌</th><td>ITN(S7) 仍读 tn_raw，不吃本阶段输出（目标间不互相污染）</td></tr></table><div class="sample-label">输入 = Stage 5 输出（上方完整行原样流入）。一行 → 3 个并发请求：</div>
+<pre><code>{
+  &quot;audio_filepath&quot;: &quot;7800-283478-0020.flac&quot;,
+  &quot;audio_item_id&quot;: &quot;7800-283478-0020&quot;,
+  &quot;duration&quot;: 2.785,
+  &quot;text&quot;: &quot;AS THE FOUR CHUMS WENT AWAY JERRY CHUCKLED&quot;,
+  &quot;abbreviated_text&quot;: &quot;As the four chums went away Jerry chuckled&quot;,
+  &quot;source_lang&quot;: &quot;en&quot;,
+  &quot;entity_recovered_text&quot;: &quot;As the four chums went away JERRY chuckled&quot;,
+  &quot;additional_notes&quot;: {
+    &amp;quot;RecoverEntities&amp;quot;: &amp;quot;recovered&amp;quot;,
+    &amp;quot;PnCRestoration&amp;quot;: &amp;quot;applied (modified)&amp;quot;,
+    &amp;quot;LanguageID&amp;quot;: &amp;quot;applied (modified)&amp;quot;,
+    &amp;quot;LLMLanguageVerification&amp;quot;: &amp;quot;passed (English-en)&amp;quot;,
+    &amp;quot;TextNormalization&amp;quot;: &amp;quot;applied (unchanged)&amp;quot;
+  },
+  &quot;pnc_text&quot;: &quot;As the four chums went away, Jerry chuckled.&quot;,
+  &quot;llm_language_prediction&quot;: &quot;Primary: English\nLanguages: English&quot;,
+  &quot;tn_raw&quot;: &quot;As the four chums went away, Jerry chuckled.&quot;
+}</code></pre><div class="sample-label">输出（完整行）：</div>
+<pre><code>{
+  &quot;audio_filepath&quot;: &quot;7800-283478-0020.flac&quot;,
+  &quot;audio_item_id&quot;: &quot;7800-283478-0020&quot;,
+  &quot;duration&quot;: 2.785,
+  &quot;text&quot;: &quot;AS THE FOUR CHUMS WENT AWAY JERRY CHUCKLED&quot;,
+  &quot;abbreviated_text&quot;: &quot;As the four chums went away Jerry chuckled&quot;,
+  &quot;source_lang&quot;: &quot;en&quot;,
+  &quot;entity_recovered_text&quot;: &quot;As the four chums went away JERRY chuckled&quot;,
+  &quot;additional_notes&quot;: {
+    &amp;quot;RecoverEntities&amp;quot;: &amp;quot;recovered&amp;quot;,
+    &amp;quot;PnCRestoration&amp;quot;: &amp;quot;applied (modified)&amp;quot;,
+    &amp;quot;LanguageID&amp;quot;: &amp;quot;applied (modified)&amp;quot;,
+    &amp;quot;LLMLanguageVerification&amp;quot;: &amp;quot;passed (English-en)&amp;quot;,
+    &amp;quot;TextNormalization&amp;quot;: &amp;quot;applied (unchanged)&amp;quot;,
+&lt;span class=&quot;delta&quot;&gt;    &amp;quot;Captioning&amp;quot;: &amp;quot;applied (modified)&amp;quot;,&lt;/span&gt;
+&lt;span class=&quot;delta&quot;&gt;    &amp;quot;CodeSwitching&amp;quot;: &amp;quot;applied (unchanged)&amp;quot;,&lt;/span&gt;
+&lt;span class=&quot;delta&quot;&gt;    &amp;quot;SpeechQA&amp;quot;: &amp;quot;applied (modified)&amp;quot;&lt;/span&gt;
+  },
+  &quot;pnc_text&quot;: &quot;As the four chums went away, Jerry chuckled.&quot;,
+  &quot;llm_language_prediction&quot;: &quot;Primary: English\nLanguages: English&quot;,
+  &quot;tn_raw&quot;: &quot;As the four chums went away, Jerry chuckled.&quot;,
+<span class="delta">  &quot;captioning_text&quot;: &quot;A brief narrative snippet describing Jerry chuckling as four friends depart.&quot;,</span>   <span class="keep">← 第三人称事实摘要</span>
+<span class="delta">  &quot;code_switched_text&quot;: &quot;As the four chums went away, Jerry chuckled.&quot;,</span>   <span class="keep">← 纯英语无音译词→原样</span>
+<span class="delta">  &quot;speech_qa_text&quot;: &quot;SKIP&quot;</span>   <span class="keep">← 内容太薄（合法数据，打包器排除）</span>
+}</code></pre><div class="variant-label">语码转换威力示例（tn_raw 为印地夹英时 code_switched_text 的值）：</div><pre><code>tn_raw:            "मुझे लगता है कि हमें इस प्रोजेक्ट को कल तक फिनिश कर देना चाहिए।"
+code_switched_text:"मुझे लगता है कि हमें इस project को कल तक finish कर देना चाहिए।"
+<span class="keep">// 语音测试: 天城文音素读出来是英语词→还原拉丁拼写; 宁漏勿过; 禁数字/禁混脚本token(H2O→H two O)</span></code></pre></div>
+<div class="stageblock">
+<h3>Stage 7：ITNRestoration → itn_raw <span class="tag gray">CPU + 远程 LLM · itn 守卫</span></h3>
+<table class="keys"><tr><th>读取键</th><td><code>tn_raw</code>（变换对象——不是 S6 输出）、<code>_skipme</code>（门禁）；<strong>不消费 source_lang</strong>（prompt 无语言占位）</td></tr><tr><th>新增键</th><td><code>itn_raw</code>（书面形式，<strong>保留非流利</strong>）</td></tr><tr><th>守卫（itn）</th><td>词数不得增加（ITN 是收缩变换）/ 无新词（"22nd" 的 nd ∈ 白名单）/ 过度删除（纯电话 10 词→1 词会被保守拒转回退）</td></tr><tr><th>回退</th><td>守卫命中 → itn_raw = tn_raw 原文，注记 fallback (原因)，被拒输出不落盘</td></tr></table><div class="sample-label">输入 = Stage 6 输出（上方完整行原样流入）。核对：8 词进 8 词出（four→4 同为 1 词）→ 通过：</div>
+<pre><code>{
+  &quot;audio_filepath&quot;: &quot;7800-283478-0020.flac&quot;,
+  &quot;audio_item_id&quot;: &quot;7800-283478-0020&quot;,
+  &quot;duration&quot;: 2.785,
+  &quot;text&quot;: &quot;AS THE FOUR CHUMS WENT AWAY JERRY CHUCKLED&quot;,
+  &quot;abbreviated_text&quot;: &quot;As the four chums went away Jerry chuckled&quot;,
+  &quot;source_lang&quot;: &quot;en&quot;,
+  &quot;entity_recovered_text&quot;: &quot;As the four chums went away JERRY chuckled&quot;,
+  &quot;additional_notes&quot;: {
+    &amp;quot;RecoverEntities&amp;quot;: &amp;quot;recovered&amp;quot;,
+    &amp;quot;PnCRestoration&amp;quot;: &amp;quot;applied (modified)&amp;quot;,
+    &amp;quot;LanguageID&amp;quot;: &amp;quot;applied (modified)&amp;quot;,
+    &amp;quot;LLMLanguageVerification&amp;quot;: &amp;quot;passed (English-en)&amp;quot;,
+    &amp;quot;TextNormalization&amp;quot;: &amp;quot;applied (unchanged)&amp;quot;,
+    &amp;quot;Captioning&amp;quot;: &amp;quot;applied (modified)&amp;quot;,
+    &amp;quot;CodeSwitching&amp;quot;: &amp;quot;applied (unchanged)&amp;quot;,
+    &amp;quot;SpeechQA&amp;quot;: &amp;quot;applied (modified)&amp;quot;
+  },
+  &quot;pnc_text&quot;: &quot;As the four chums went away, Jerry chuckled.&quot;,
+  &quot;llm_language_prediction&quot;: &quot;Primary: English\nLanguages: English&quot;,
+  &quot;tn_raw&quot;: &quot;As the four chums went away, Jerry chuckled.&quot;,
+  &quot;captioning_text&quot;: &quot;A brief narrative snippet describing Jerry chuckling as four friends depart.&quot;,
+  &quot;code_switched_text&quot;: &quot;As the four chums went away, Jerry chuckled.&quot;,
+  &quot;speech_qa_text&quot;: &quot;SKIP&quot;
+}</code></pre><div class="sample-label">输出（完整行）：</div>
+<pre><code>{
+  &quot;audio_filepath&quot;: &quot;7800-283478-0020.flac&quot;,
+  &quot;audio_item_id&quot;: &quot;7800-283478-0020&quot;,
+  &quot;duration&quot;: 2.785,
+  &quot;text&quot;: &quot;AS THE FOUR CHUMS WENT AWAY JERRY CHUCKLED&quot;,
+  &quot;abbreviated_text&quot;: &quot;As the four chums went away Jerry chuckled&quot;,
+  &quot;source_lang&quot;: &quot;en&quot;,
+  &quot;entity_recovered_text&quot;: &quot;As the four chums went away JERRY chuckled&quot;,
+  &quot;additional_notes&quot;: {
+    &amp;quot;RecoverEntities&amp;quot;: &amp;quot;recovered&amp;quot;,
+    &amp;quot;PnCRestoration&amp;quot;: &amp;quot;applied (modified)&amp;quot;,
+    &amp;quot;LanguageID&amp;quot;: &amp;quot;applied (modified)&amp;quot;,
+    &amp;quot;LLMLanguageVerification&amp;quot;: &amp;quot;passed (English-en)&amp;quot;,
+    &amp;quot;TextNormalization&amp;quot;: &amp;quot;applied (unchanged)&amp;quot;,
+    &amp;quot;Captioning&amp;quot;: &amp;quot;applied (modified)&amp;quot;,
+    &amp;quot;CodeSwitching&amp;quot;: &amp;quot;applied (unchanged)&amp;quot;,
+    &amp;quot;SpeechQA&amp;quot;: &amp;quot;applied (modified)&amp;quot;,
+&lt;span class=&quot;delta&quot;&gt;    &amp;quot;ITNRestoration&amp;quot;: &amp;quot;applied (modified)&amp;quot;&lt;/span&gt;
+  },
+  &quot;pnc_text&quot;: &quot;As the four chums went away, Jerry chuckled.&quot;,
+  &quot;llm_language_prediction&quot;: &quot;Primary: English\nLanguages: English&quot;,
+  &quot;tn_raw&quot;: &quot;As the four chums went away, Jerry chuckled.&quot;,
+  &quot;captioning_text&quot;: &quot;A brief narrative snippet describing Jerry chuckling as four friends depart.&quot;,
+  &quot;code_switched_text&quot;: &quot;As the four chums went away, Jerry chuckled.&quot;,
+  &quot;speech_qa_text&quot;: &quot;SKIP&quot;,
+<span class="delta">  &quot;itn_raw&quot;: &quot;As the 4 chums went away, Jerry chuckled.&quot;</span>   <span class="keep">← four → 4</span>
+}</code></pre><div class="variant-label">itn_raw ≠ pnc_text（答疑）：</div><pre><code>生产链路 ASR 被 prompt 要求输出"口语数字形式", pnc_text 是词形, ITN 是唯一书面形式来源;
+itn_raw 从 tn_raw 派生 → 与 tn_raw 逐词对齐(论文 aligned targets), 书写约定统一($12.50 而非 12.5 dollars)
+守卫命中例: 模型改写 "purchased" → itn_raw = tn_raw 原文, "fallback (novel_words: ['purchased'])"</code></pre></div>
+<div class="stageblock">
+<h3>Stage 8：DisfluencyRemoval → itn_clean <span class="tag gray">CPU + 远程 LLM · itn 守卫(阈值收紧)</span></h3>
+<table class="keys"><tr><th>读取键</th><td><code>itn_raw</code>（变换对象）、<code>_skipme</code>（门禁）；不消费 source_lang</td></tr><tr><th>新增键</th><td><code>itn_clean</code>（干净书面形式——9 个文本目标的最后一个）</td></tr><tr><th>只删三类</th><td>填充词(um/uh/like…)、重复词(I I think)、错误起始(go- going)；数字/标点/口语形式(gonna)/语法错误/内容词/语言全保留</td></tr><tr><th>守卫特例</th><td><code>min_word_retention_ratio: 0.5</code>（唯一收紧，删过半≈改写）；<code>min_words_for_deletion_check=8</code>：&lt;8 词输入<strong>跳过删除检查</strong>，其余检查照常</td></tr></table><div class="sample-label">输入 = Stage 7 输出（上方完整行原样流入）。朗读语料无非流利可删：</div>
+<pre><code>{
+  &quot;audio_filepath&quot;: &quot;7800-283478-0020.flac&quot;,
+  &quot;audio_item_id&quot;: &quot;7800-283478-0020&quot;,
+  &quot;duration&quot;: 2.785,
+  &quot;text&quot;: &quot;AS THE FOUR CHUMS WENT AWAY JERRY CHUCKLED&quot;,
+  &quot;abbreviated_text&quot;: &quot;As the four chums went away Jerry chuckled&quot;,
+  &quot;source_lang&quot;: &quot;en&quot;,
+  &quot;entity_recovered_text&quot;: &quot;As the four chums went away JERRY chuckled&quot;,
+  &quot;additional_notes&quot;: {
+    &amp;quot;RecoverEntities&amp;quot;: &amp;quot;recovered&amp;quot;,
+    &amp;quot;PnCRestoration&amp;quot;: &amp;quot;applied (modified)&amp;quot;,
+    &amp;quot;LanguageID&amp;quot;: &amp;quot;applied (modified)&amp;quot;,
+    &amp;quot;LLMLanguageVerification&amp;quot;: &amp;quot;passed (English-en)&amp;quot;,
+    &amp;quot;TextNormalization&amp;quot;: &amp;quot;applied (unchanged)&amp;quot;,
+    &amp;quot;Captioning&amp;quot;: &amp;quot;applied (modified)&amp;quot;,
+    &amp;quot;CodeSwitching&amp;quot;: &amp;quot;applied (unchanged)&amp;quot;,
+    &amp;quot;SpeechQA&amp;quot;: &amp;quot;applied (modified)&amp;quot;,
+    &amp;quot;ITNRestoration&amp;quot;: &amp;quot;applied (modified)&amp;quot;
+  },
+  &quot;pnc_text&quot;: &quot;As the four chums went away, Jerry chuckled.&quot;,
+  &quot;llm_language_prediction&quot;: &quot;Primary: English\nLanguages: English&quot;,
+  &quot;tn_raw&quot;: &quot;As the four chums went away, Jerry chuckled.&quot;,
+  &quot;captioning_text&quot;: &quot;A brief narrative snippet describing Jerry chuckling as four friends depart.&quot;,
+  &quot;code_switched_text&quot;: &quot;As the four chums went away, Jerry chuckled.&quot;,
+  &quot;speech_qa_text&quot;: &quot;SKIP&quot;,
+  &quot;itn_raw&quot;: &quot;As the 4 chums went away, Jerry chuckled.&quot;
+}</code></pre><div class="sample-label">输出（完整行）：</div>
+<pre><code>{
+  &quot;audio_filepath&quot;: &quot;7800-283478-0020.flac&quot;,
+  &quot;audio_item_id&quot;: &quot;7800-283478-0020&quot;,
+  &quot;duration&quot;: 2.785,
+  &quot;text&quot;: &quot;AS THE FOUR CHUMS WENT AWAY JERRY CHUCKLED&quot;,
+  &quot;abbreviated_text&quot;: &quot;As the four chums went away Jerry chuckled&quot;,
+  &quot;source_lang&quot;: &quot;en&quot;,
+  &quot;entity_recovered_text&quot;: &quot;As the four chums went away JERRY chuckled&quot;,
+  &quot;additional_notes&quot;: {
+    &amp;quot;RecoverEntities&amp;quot;: &amp;quot;recovered&amp;quot;,
+    &amp;quot;PnCRestoration&amp;quot;: &amp;quot;applied (modified)&amp;quot;,
+    &amp;quot;LanguageID&amp;quot;: &amp;quot;applied (modified)&amp;quot;,
+    &amp;quot;LLMLanguageVerification&amp;quot;: &amp;quot;passed (English-en)&amp;quot;,
+    &amp;quot;TextNormalization&amp;quot;: &amp;quot;applied (unchanged)&amp;quot;,
+    &amp;quot;Captioning&amp;quot;: &amp;quot;applied (modified)&amp;quot;,
+    &amp;quot;CodeSwitching&amp;quot;: &amp;quot;applied (unchanged)&amp;quot;,
+    &amp;quot;SpeechQA&amp;quot;: &amp;quot;applied (modified)&amp;quot;,
+    &amp;quot;ITNRestoration&amp;quot;: &amp;quot;applied (modified)&amp;quot;,
+&lt;span class=&quot;delta&quot;&gt;    &amp;quot;DisfluencyRemoval&amp;quot;: &amp;quot;applied (unchanged)&amp;quot;&lt;/span&gt;
+  },
+  &quot;pnc_text&quot;: &quot;As the four chums went away, Jerry chuckled.&quot;,
+  &quot;llm_language_prediction&quot;: &quot;Primary: English\nLanguages: English&quot;,
+  &quot;tn_raw&quot;: &quot;As the four chums went away, Jerry chuckled.&quot;,
+  &quot;captioning_text&quot;: &quot;A brief narrative snippet describing Jerry chuckling as four friends depart.&quot;,
+  &quot;code_switched_text&quot;: &quot;As the four chums went away, Jerry chuckled.&quot;,
+  &quot;speech_qa_text&quot;: &quot;SKIP&quot;,
+  &quot;itn_raw&quot;: &quot;As the 4 chums went away, Jerry chuckled.&quot;,
+<span class="delta">  &quot;itn_clean&quot;: &quot;As the 4 chums went away, Jerry chuckled.&quot;</span>   <span class="keep">← 与 itn_raw 逐字相同</span>
+}</code></pre><div class="variant-label">转换与 8 词门槛示例：</div><pre><code>实际删除: itn_raw="Uh, I bought 3 apples for $12.50 on January 22nd, go- going to make a pie."(16词)
+        itn_clean="I bought 3 apples for $12.50 on January 22nd to make a pie."(13词)
+        保留率 13/16=0.81 ≥ 0.5 ✓ → applied (modified); itn_raw 原样保留(带非流利版本可对比)
+8词门槛: "um uh yeah okay you know like whatever"(7词)→"whatever" 放行(删除检查跳过);
+        同句 8 词版 → 拒, itn_clean=原文, "fallback (excessive_deletion (8-&gt;1))"
+守卫命中: itn_clean = itn_raw 原文; 被拒模型输出不落盘(注记只留原因+词数)</code></pre></div>
+<div class="stageblock">
+<h3>Stage 9：ManifestWriterStage（落盘） <span class="tag gray">纯 CPU · 单写者</span></h3>
+<table class="keys"><tr><th>读取键</th><td><code>task.data</code> 整体（无张量风险——全程未加载音频）</td></tr><tr><th>新增键</th><td>无（纯 sink；data 零变化）</td></tr><tr><th>副作用</th><td>写输出 JSONL + <code>._RUN</code>/<code>._RESUME</code> 伴生文件</td></tr></table><div class="sample-label">输入 = Stage 8 输出（上方完整行原样流入）：</div>
+<pre><code>{
+  &quot;audio_filepath&quot;: &quot;7800-283478-0020.flac&quot;,
+  &quot;audio_item_id&quot;: &quot;7800-283478-0020&quot;,
+  &quot;duration&quot;: 2.785,
+  &quot;text&quot;: &quot;AS THE FOUR CHUMS WENT AWAY JERRY CHUCKLED&quot;,
+  &quot;abbreviated_text&quot;: &quot;As the four chums went away Jerry chuckled&quot;,
+  &quot;source_lang&quot;: &quot;en&quot;,
+  &quot;entity_recovered_text&quot;: &quot;As the four chums went away JERRY chuckled&quot;,
+  &quot;additional_notes&quot;: {
+    &amp;quot;RecoverEntities&amp;quot;: &amp;quot;recovered&amp;quot;,
+    &amp;quot;PnCRestoration&amp;quot;: &amp;quot;applied (modified)&amp;quot;,
+    &amp;quot;LanguageID&amp;quot;: &amp;quot;applied (modified)&amp;quot;,
+    &amp;quot;LLMLanguageVerification&amp;quot;: &amp;quot;passed (English-en)&amp;quot;,
+    &amp;quot;TextNormalization&amp;quot;: &amp;quot;applied (unchanged)&amp;quot;,
+    &amp;quot;Captioning&amp;quot;: &amp;quot;applied (modified)&amp;quot;,
+    &amp;quot;CodeSwitching&amp;quot;: &amp;quot;applied (unchanged)&amp;quot;,
+    &amp;quot;SpeechQA&amp;quot;: &amp;quot;applied (modified)&amp;quot;,
+    &amp;quot;ITNRestoration&amp;quot;: &amp;quot;applied (modified)&amp;quot;,
+    &amp;quot;DisfluencyRemoval&amp;quot;: &amp;quot;applied (unchanged)&amp;quot;
+  },
+  &quot;pnc_text&quot;: &quot;As the four chums went away, Jerry chuckled.&quot;,
+  &quot;llm_language_prediction&quot;: &quot;Primary: English\nLanguages: English&quot;,
+  &quot;tn_raw&quot;: &quot;As the four chums went away, Jerry chuckled.&quot;,
+  &quot;captioning_text&quot;: &quot;A brief narrative snippet describing Jerry chuckling as four friends depart.&quot;,
+  &quot;code_switched_text&quot;: &quot;As the four chums went away, Jerry chuckled.&quot;,
+  &quot;speech_qa_text&quot;: &quot;SKIP&quot;,
+  &quot;itn_raw&quot;: &quot;As the 4 chums went away, Jerry chuckled.&quot;,
+  &quot;itn_clean&quot;: &quot;As the 4 chums went away, Jerry chuckled.&quot;
+}</code></pre><div class="sample-label">输出 = 写入 /output/english_output.jsonl 的一行（6 字段进 → 17 字段出，一行式落盘形态）：</div>
+<pre><code>{&quot;audio_filepath&quot;: &quot;7800-283478-0020.flac&quot;, &quot;audio_item_id&quot;: &quot;7800-283478-0020&quot;, &quot;duration&quot;: 2.785, &quot;text&quot;: &quot;AS THE FOUR CHUMS WENT AWAY JERRY CHUCKLED&quot;, &quot;abbreviated_text&quot;: &quot;As the four chums went away Jerry chuckled&quot;, &quot;source_lang&quot;: &quot;en&quot;, &quot;entity_recovered_text&quot;: &quot;As the four chums went away JERRY chuckled&quot;, &quot;additional_notes&quot;: {&quot;RecoverEntities&quot;: &quot;recovered&quot;, &quot;PnCRestoration&quot;: &quot;applied (modified)&quot;, &quot;LanguageID&quot;: &quot;applied (modified)&quot;, &quot;LLMLanguageVerification&quot;: &quot;passed (English-en)&quot;, &quot;TextNormalization&quot;: &quot;applied (unchanged)&quot;, &quot;Captioning&quot;: &quot;applied (modified)&quot;, &quot;CodeSwitching&quot;: &quot;applied (unchanged)&quot;, &quot;SpeechQA&quot;: &quot;applied (modified)&quot;, &quot;ITNRestoration&quot;: &quot;applied (modified)&quot;, &quot;DisfluencyRemoval&quot;: &quot;applied (unchanged)&quot;}, &quot;pnc_text&quot;: &quot;As the four chums went away, Jerry chuckled.&quot;, &quot;llm_language_prediction&quot;: &quot;Primary: English\nLanguages: English&quot;, &quot;tn_raw&quot;: &quot;As the four chums went away, Jerry chuckled.&quot;, &quot;captioning_text&quot;: &quot;A brief narrative snippet describing Jerry chuckling as four friends depart.&quot;, &quot;code_switched_text&quot;: &quot;As the four chums went away, Jerry chuckled.&quot;, &quot;speech_qa_text&quot;: &quot;SKIP&quot;, &quot;itn_raw&quot;: &quot;As the 4 chums went away, Jerry chuckled.&quot;, &quot;itn_clean&quot;: &quot;As the 4 chums went away, Jerry chuckled.&quot;}</code></pre><div class="variant-label">被标行最终形态（语言不符——标记在 S4 提交期诞生，完整行）：</div>
+<pre><code>{
+  &quot;audio_filepath&quot;: &quot;yt1001_seg000003.opus&quot;,
+  &quot;audio_item_id&quot;: &quot;yt1001_seg000003&quot;,
+  &quot;duration&quot;: 5.2,
+  &quot;text&quot;: &quot;&quot;,
+  &quot;abbreviated_text&quot;: &quot;the weather is nice today let us go outside&quot;,
+  &quot;source_lang&quot;: &quot;hi&quot;,
+  &quot;entity_recovered_text&quot;: &quot;the weather is nice today let us go outside&quot;,
+  &quot;pnc_text&quot;: &quot;The weather is nice today. Let us go outside.&quot;,
+  &quot;llm_language_prediction&quot;: &quot;Primary: English\nLanguages: English&quot;,
+<span class="delta">  &quot;tn_raw&quot;: &quot;&quot;,</span>   <span class="keep">← S5 起全部置空串</span>
+<span class="delta">  &quot;captioning_text&quot;: &quot;&quot;,</span>
+<span class="delta">  &quot;code_switched_text&quot;: &quot;&quot;,</span>
+<span class="delta">  &quot;speech_qa_text&quot;: &quot;&quot;,</span>
+<span class="delta">  &quot;itn_raw&quot;: &quot;&quot;,</span>
+<span class="delta">  &quot;itn_clean&quot;: &quot;&quot;,</span>
+  &quot;additional_notes&quot;: {
+    &amp;quot;RecoverEntities&amp;quot;: &amp;quot;skipped (empty)&amp;quot;,
+    &amp;quot;PnCRestoration&amp;quot;: &amp;quot;applied (modified)&amp;quot;,
+    &amp;quot;LanguageID&amp;quot;: &amp;quot;applied (modified)&amp;quot;,
+&lt;span class=&quot;delta&quot;&gt;    &amp;quot;LLMLanguageVerification&amp;quot;: &amp;quot;wrong language (predicted=English-en, expected=Hindi-hi)&amp;quot;,&lt;/span&gt;
+&lt;span class=&quot;delta&quot;&gt;    &amp;quot;TextNormalization&amp;quot;: &amp;quot;skipped (flagged)&amp;quot;,&lt;/span&gt;
+&lt;span class=&quot;delta&quot;&gt;    &amp;quot;Captioning&amp;quot;: &amp;quot;skipped (flagged)&amp;quot;,&lt;/span&gt;
+&lt;span class=&quot;delta&quot;&gt;    &amp;quot;CodeSwitching&amp;quot;: &amp;quot;skipped (flagged)&amp;quot;,&lt;/span&gt;
+&lt;span class=&quot;delta&quot;&gt;    &amp;quot;SpeechQA&amp;quot;: &amp;quot;skipped (flagged)&amp;quot;,&lt;/span&gt;
+&lt;span class=&quot;delta&quot;&gt;    &amp;quot;ITNRestoration&amp;quot;: &amp;quot;skipped (flagged)&amp;quot;,&lt;/span&gt;
+&lt;span class=&quot;delta&quot;&gt;    &amp;quot;DisfluencyRemoval&amp;quot;: &amp;quot;skipped (flagged)&amp;quot;&lt;/span&gt;
+  },
+<span class="delta">  &quot;_skipme&quot;: &quot;Wrong language:LLMLanguageVerification&quot;</span>   <span class="keep">← 原样保留落盘</span>
+}</code></pre><p>字段空/满分布直接反映标记发生在第几步（entity_recovered_text 有值=S2 透传、pnc_text 有值=标记在 S4 提交期之后才诞生）。PY_CHECK 五层校验：行身份 / 输入字段原样 / 九字段非空（"SKIP" 算非空）/ 注记词表 / LLMLanguageVerification 以 passed ( 开头。</p></div>
+
+  <div class="toc-back"><a href="#toc">↑ 返回目录</a></div>
+</section>
+<section id="s8">
+  <h2>8. text_pipeline 关键概念问答</h2>
+  <h3>Q：TN 与 ITN 的区别？</h3>
+  <table>
+    <tr><th></th><th>TN（Stage 5）</th><th>ITN（Stage 7）</th></tr>
+    <tr><td>方向</td><td>书面→口语（<code>3→three</code>、<code>$12.50→twelve dollars and fifty cents</code>）</td><td>口语→书面（反向）</td></tr>
+    <tr><td>非流利</td><td>保留</td><td>保留（itn_clean 才删）</td></tr>
+    <tr><td>守卫</td><td>none（膨胀合法）</td><td>itn（增加/新词可疑）</td></tr>
+    <tr><td>产物角色</td><td>tn_raw 共同源、逐字转写训练目标</td><td>itn_raw 书面目标、itn_clean 底稿</td></tr>
+  </table>
+  <p>串联一对可逆变换，非流利原样穿过两者；<code>tn_raw</code>（怎么说）与 <code>itn_raw</code>（怎么写）构成同一段语音的对齐双目标，删除被隔离在 S8。</p>
+  <h3>Q：fallback 注记需要自己编码吗？</h3>
+  <p>不需要——检测（<code>_check_novel_words</code>：拉丁字母段提取 + 白名单 + 罗马数字）、判决（<code>_validate</code>）、回退+写注记（<code>_read_response</code> + 提交阶段）全部内置于 <code>AudioTextLLMStage</code> 基类；YAML 只开关（<code>validation_mode</code>）和调阈值。仅扩白名单/新增守卫类型才需子类化写代码。</p>
+  <h3>Q：Primary / Languages 是谁的预测？</h3>
+  <p>都是 Stage 4 的 LLM 读 <code>pnc_text</code> 的预测：Primary=文本主导语言，Languages=全部在场语言；metadata 的声学预测在 <code>source_lang</code> 字段（verify 的 expected）。primary≠expected 但 expected 在列表 → 多语言分支放行（语码转换优先信任，分歧留注记 source present/absent）。</p>
+  <div class="toc-back"><a href="#toc">↑ 返回目录</a></div></section>
+<section id="s9">
+  <h2>9. 并发模型与校验闭环</h2>
+  <h3>AudioTextLLMStage 的两层并发</h3>
+  <table>
+    <tr><th>层</th><th>机制</th><th>教程参数</th></tr>
+    <tr><td>Worker 级</td><td>executor 复制 stage 实例到 N 个 <strong>worker 进程</strong>（非线程），各领数据分区；worker 内批间串行，<code>_runtime_lock</code> 保证同实例无并发批</td><td><code>num_workers_override: 12</code></td></tr>
+    <tr><td>请求级</td><td>单 worker 单线程<strong>事件循环</strong>，整批 ≤384 条消息（融合 3×128）作为 asyncio 任务一次 gather；I/O 多路复用，无新线程</td><td><code>max_concurrent_requests: 256</code>（信号量，恰配 vLLM max_num_seqs=256）</td></tr>
+  </table>
+  <p>"5 个并发"两种理解：num_workers=5 → 5 个进程实例；max_concurrent_requests=5 → 信号量限 5 个在途请求（协程排队）。纯 I/O 密集，GIL 无关；GPU 并行在流水线外的 vLLM 服务端。</p>
+  <h3>PY_CHECK 五层校验（带数据）</h3>
+  <table>
+    <tr><th>层</th><th>断言</th><th>数据样例</th></tr>
+    <tr><td>行数与身份</td><td><code>len(output)==len(by_id)==len(source)==2</code></td><td>输出 3 行含重复 ID → 3≠2 拒</td></tr>
+    <tr><td>输入字段原样</td><td><code>all(row[k]==v)</code></td><td>duration 被改成 2.79 → 拒</td></tr>
+    <tr><td>样本干净</td><td><code>not row.get("_skipme")</code></td><td>"Wrong language:…" → 拒</td></tr>
+    <tr><td>九字段非空</td><td><code>isinstance(str) and strip()</code></td><td>"SKIP" 算非空（合法数据）；itn_clean="" → 拒</td></tr>
+    <tr><td>注记词表</td><td>操作注记 ∈ {recovered, unchanged} 或 applied (/fallback ( 前缀；<code>LLMLanguageVerification</code> 以 passed ( 开头</td><td>"skipped (flagged)" → 拒；"kept code-switch…" → 拒（纯英语样本不应出现）</td></tr>
+  </table>
+  <div class="warn">全绿只证明管线执行正确，不是文本质量分数——模型生成内容需人工听音频复核。</div>
+  <div class="toc-back"><a href="#toc">↑ 返回目录</a></div></section>
+<footer>基于 granary-v2.pdf 与 NeMo Curator granary_v2 教程源码的对话记录整理 ｜ 所有代码引用均来自本仓库只读解读</footer>
+</div>
+</body>
+</html>
